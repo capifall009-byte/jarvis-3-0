@@ -1,0 +1,73 @@
+{
+  "app": "JARVIS 3.0",
+  "version": "3.0.0",
+  "platform": "iOS Safari, Apple Shortcuts & Future Native App Intents",
+  "note": "iOS Web utilise la navigation HTTPS avec paramètres de requête ou l'action Raccourcis 'Obtenir le contenu de l'URL'. Ce schéma prépare également le contrat typé des futurs Apple App Intents natifs.",
+  "urlIntents": [
+    {
+      "id": "listen",
+      "description": "Ouvre JARVIS dans Safari et prépare l'écoute vocale dans une nouvelle session.",
+      "path": "/?action=listen&new=1",
+      "params": {
+        "action": "listen",
+        "new": "1"
+      }
+    },
+    {
+      "id": "ask",
+      "description": "Envoie directement une question dictée par Siri à JARVIS et affiche/lit la réponse.",
+      "path": "/?q={TEXTE_URL_ENCODE}&new=1",
+      "params": {
+        "q": "Texte de la requête (encodé URL)",
+        "new": "1 (optionnel, démarre une nouvelle conversation)",
+        "mute": "1 (optionnel, désactive la lecture vocale)"
+      }
+    },
+    {
+      "id": "open_view",
+      "description": "Ouvre directement un espace de JARVIS 3.0 (conversations, memory, search, files, video, settings).",
+      "path": "/?view={NOM_ESPACE}",
+      "params": {
+        "view": "conversations | memory | search | files | video | settings"
+      }
+    },
+    {
+      "id": "new_session",
+      "description": "Démarre une nouvelle conversation vierge.",
+      "path": "/?action=new"
+    }
+  ],
+  "siriApiEndpoint": {
+    "method": "POST",
+    "path": "/api/siri",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "requestBody": {
+      "query": "Votre question en français"
+    },
+    "responseBody": {
+      "reply": "Réponse textuelle de JARVIS",
+      "spokenText": "Version optimisée pour la lecture vocale Siri",
+      "model": "gemini-3.1-flash-lite",
+      "tone": "neutral | empathetic | sarcastic | warm | calm"
+    }
+  },
+  "futureNativeAppIntents": [
+    {
+      "identifier": "AskJarvisIntent",
+      "title": "Demander à JARVIS",
+      "endpoint": "/api/siri"
+    },
+    {
+      "identifier": "SearchWebWithJarvisIntent",
+      "title": "Rechercher sur Internet avec JARVIS",
+      "endpoint": "/api/web/search"
+    },
+    {
+      "identifier": "OpenOfflineMemoryIntent",
+      "title": "Consulter un souvenir hors ligne",
+      "deepLink": "/?view=memory"
+    }
+  ]
+}

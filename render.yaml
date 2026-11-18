@@ -1,0 +1,26 @@
+# Déploiement prêt à l'emploi — Render (offre gratuite avec URL HTTPS permanente).
+# Connexion requise : créer un compte Render (gratuit), puis "New > Blueprint" depuis le dépôt.
+services:
+  - type: web
+    name: jarvis-3
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --no-audit --no-fund && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JARVIS_PUBLIC_BASIC_USER
+        value: jarvis
+      - key: JARVIS_PUBLIC_BASIC_PASS
+        sync: false
+      - key: JARVIS_REQUIRE_AUTH
+        value: "false"
+      - key: DISABLE_HMR
+        value: "true"

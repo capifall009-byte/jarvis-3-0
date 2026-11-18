@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS",
+  "description": "Assistant vocal IA personnel en temps réel inspiré de Tony Stark, propulsé par Gemini Live API et optimisé pour Safari iOS.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
