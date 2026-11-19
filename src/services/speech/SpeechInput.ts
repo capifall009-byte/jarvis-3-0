@@ -176,7 +176,7 @@ export class SpeechInput {
       if (code === "not-allowed" || code === "service-not-allowed") {
         callbacks.onError(
           "Autorisation microphone requise",
-          "Sur iPhone : touchez « aA » dans la barre Safari > Réglages du site web > Microphone > Autoriser, ou activez Dictée et Microphone dans Réglages > Safari."
+          "Sur Android (Chrome) : appuyez sur l'icône de cadenas dans la barre d'adresse > Autorisations > Microphone > Autoriser, puis rechargez la page. Sur iPhone (Safari) : touchez « aA » > Réglages du site web > Microphone > Autoriser."
         );
         return;
       }
@@ -190,7 +190,7 @@ export class SpeechInput {
       if (code === "network") {
         callbacks.onError(
           "Erreur réseau de dictée vocale",
-          "Le service de reconnaissance vocale est temporairement indisponible. Vous pouvez écrire votre message."
+          "La reconnaissance vocale nécessite une connexion Internet sur de nombreux appareils Android. Vérifiez votre réseau, puis réessayez ou écrivez votre message."
         );
         return;
       }
