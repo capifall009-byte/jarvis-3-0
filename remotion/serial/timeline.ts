@@ -26,7 +26,7 @@ const RAW: Array<{ id: SerialSceneId; narration: string }> = [
   { id: "s5", narration: "Le message était daté de demain." },
   { id: "s6", narration: "La sonnerie s'arrête. Puis recommence." },
   { id: "s7", narration: "Cette fois, elle vient de l'autre côté de la porte." },
-  { id: "s8", narration: "Vote : répondre, ou laisser sonner. Abonne-toi pour le jour deux." },
+  { id: "s8", narration: "Vote : répondre ou laisser sonner. À demain pour le jour deux." },
 ];
 
 export const SERIAL_SCENES: SerialScene[] = RAW.map((scene, index) => {
@@ -42,7 +42,7 @@ export const SERIAL_SCENES: SerialScene[] = RAW.map((scene, index) => {
 });
 
 /** Décalage de la voix off à l'intérieur de chaque scène. */
-export const SERIAL_NARRATION_OFFSET = 16;
+export const SERIAL_NARRATION_OFFSET = 14;
 
 export const SERIAL_AUDIO = {
   ambient: "serial/audio/ambient.mp3",

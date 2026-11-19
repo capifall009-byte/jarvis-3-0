@@ -15,6 +15,17 @@ import { analyzeUserSentiment, normalizeTone } from "../shared/sentiment.ts";
 import type { JarvisTone } from "../shared/sentiment.ts";
 import { buildTimeContextForMessage } from "./services/time/worldTime.ts";
 
+interface GeminiAttachmentInput {
+  name?: string;
+  mimeType?: string;
+  /** data URL (data:...;base64,...) ou base64 brut */
+  dataUrl?: string;
+  dataBase64?: string;
+  textContent?: string;
+  kind?: string;
+  size?: number;
+}
+
 interface GeminiRequestBody {
   message?: string;
   history?: Array<{ role: "user" | "assistant"; text: string }>;
@@ -47,6 +58,7 @@ interface GeminiRequestBody {
     blockers?: string[];
   }>;
   userTimeZone?: string;
+  attachments?: GeminiAttachmentInput[];
 }
 
 /** Retire les balises de mémorisation du texte visible (le client les extrait déjà,
@@ -59,6 +71,74 @@ function capText(value: unknown, max: number): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
   return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
+}
+
+function extractBase64(input: GeminiAttachmentInput): { data: string; mimeType: string } | null {
+  const mimeType = String(input.mimeType || "application/octet-stream").split(";")[0].trim() || "application/octet-stream";
+  const raw = String(input.dataBase64 || input.dataUrl || "").trim();
+  if (!raw) return null;
+  const m = raw.match(/^data:([^;]+);base64,(.+)$/i);
+  if (m) return { data: m[2], mimeType: (m[1] || mimeType).split(";")[0].trim() };
+  // assume raw base64
+  return { data: raw.replace(/\s+/g, ""), mimeType };
+}
+
+function buildUserParts(message: string, attachments: GeminiAttachmentInput[] | undefined): any[] {
+  const parts: any[] = [];
+  const atts = Array.isArray(attachments) ? attachments.slice(0, 8) : [];
+  const notes: string[] = [];
+  for (const att of atts) {
+    const name = String(att?.name || "fichier").slice(0, 180);
+    const mimeType = String(att?.mimeType || "").toLowerCase();
+    const kind = String(att?.kind || "");
+    const textContent = typeof att?.textContent === "string" ? att.textContent : "";
+    const isImage = mimeType.startsWith("image/") || kind === "image";
+    const isPdf = mimeType === "application/pdf" || kind === "pdf";
+    const isTextLike = mimeType.startsWith("text/") || kind === "text" || kind === "document";
+    const b64 = extractBase64(att);
+
+    if ((isImage || isPdf) && b64 && b64.data) {
+      // Limite taille base64 (~24 Mo en données décodées ~ 32 Mo b64) pour rester raisonnable
+      if (b64.data.length <= 24 * 1024 * 1024) {
+        parts.push({ inlineData: { mimeType: b64.mimeType || mimeType || "application/octet-stream", data: b64.data } });
+        notes.push(`Pièce jointe (${isImage ? "image" : "PDF"}): ${name}`);
+        continue;
+      } else {
+        notes.push(`Pièce jointe ignorée (trop volumineuse > 24 Mo): ${name}`);
+        continue;
+      }
+    }
+    if (textContent && textContent.trim()) {
+      notes.push(`Pièce jointe (texte/document: ${name}, ${mimeType || "type inconnu"}):\n${capText(textContent, 30000)}`);
+      continue;
+    }
+    if (b64 && b64.data && isTextLike) {
+      // tenter décodage simple côté serveur si texte-like fourni en base64
+      try {
+        const decoded = Buffer.from(b64.data, "base64").toString("utf8");
+        if (decoded && decoded.trim()) {
+          notes.push(`Pièce jointe (texte/document: ${name}):\n${capText(decoded, 30000)}`);
+          continue;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (b64 && b64.data) {
+      // autre binaire non textuel (ex: docx sans extraction) — on ne peut pas l'analyser sans extraction réelle
+      notes.push(`Pièce jointe reçue mais non analysable sans extraction de texte côté client/serveur: ${name} (${mimeType || "type inconnu"}). Demande à l'utilisateur de fournir le texte ou un format pris en charge (image, PDF, texte).`);
+    } else {
+      notes.push(`Pièce jointe mentionnée mais sans contenu exploitable: ${name}.`);
+    }
+  }
+
+  let finalText = message || "";
+  if (notes.length > 0) {
+    const prefix = "[Pièces jointes fournies avec le message]\n" + notes.join("\n\n");
+    finalText = finalText ? `${finalText}\n\n${prefix}` : `${prefix}\n\nAnalyse les pièces jointes fournies et réponds à la demande.`;
+  }
+  parts.push({ text: finalText || "Analyse les pièces jointes fournies." });
+  return parts;
 }
 
 function stripToneTag(
@@ -111,7 +191,8 @@ export function createGeminiRouter(): Router {
       const body = (req.body ?? {}) as GeminiRequestBody;
       // Bornage des données client : évite les prompts surdimensionnés et limite la surface d'injection.
       const message = capText(body.message, 8000);
-      if (!message) {
+      const hasAttachments = Array.isArray(body.attachments) && body.attachments.length > 0;
+      if (!message && !hasAttachments) {
         res.status(400).json({ error: "Le message ne peut pas être vide." });
         return;
       }
@@ -137,7 +218,7 @@ export function createGeminiRouter(): Router {
           })),
         {
           role: "user",
-          parts: [{ text: message }],
+          parts: buildUserParts(message, body.attachments),
         },
       ];
 

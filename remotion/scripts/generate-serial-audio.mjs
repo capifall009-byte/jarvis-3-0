@@ -20,7 +20,7 @@ const LINES = [
   { file: "s5.mp3", text: "Le message était daté de demain." },
   { file: "s6.mp3", text: "La sonnerie s'arrête. Puis recommence." },
   { file: "s7.mp3", text: "Cette fois, elle vient de l'autre côté de la porte." },
-  { file: "s8.mp3", text: "Vote : répondre, ou laisser sonner. Abonne-toi pour le jour deux." },
+  { file: "s8.mp3", text: "Vote : répondre ou laisser sonner. À demain pour le jour deux." },
 ];
 
 const FFMPEG =

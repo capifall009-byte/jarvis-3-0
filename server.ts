@@ -11,10 +11,12 @@ import { createNewsRouter } from "./server/modules/newsRoute.ts";
 import { createVideoRouter } from "./server/modules/videoRoute.ts";
 import { createAiVideoRouter } from "./server/modules/aiVideoRoute.ts";
 import { createReelRouter } from "./server/modules/reelRoute.ts";
+import { createHyperframesRouter } from "./server/modules/hyperframesRoute.ts";
 import { createVideoStudioRouter } from "./server/modules/videoStudioRoute.ts";
 import { createSocialRouter } from "./server/modules/socialRoute.ts";
 import { createAiProvidersRouter } from "./server/modules/aiProvidersRoute.ts";
 import { createOllamaRouter } from "./server/modules/ollamaRoute.ts";
+import { createImageGenRouter } from "./server/modules/imageGenRoute.ts";
 import { createApiSecurityMiddleware, createBasicAuthMiddleware } from "./server/modules/apiSecurity.ts";
 import { migratePlaintextTokens } from "./server/modules/social/tokenStore.ts";
 
@@ -41,6 +43,12 @@ async function bootstrap() {
   // recopié après le build de production.
   app.use("/reels", express.static(path.resolve(process.cwd(), "public", "reels")));
 
+  // Vidéos rendues par Hyperframes (compositions HTML -> MP4).
+  app.use(
+    "/hyperframes",
+    express.static(path.resolve(process.cwd(), "public", "hyperframes"))
+  );
+
   // Vidéos générées par le Studio vidéo (script + voix off + Remotion).
   app.use(
     "/generated",
@@ -59,10 +67,12 @@ async function bootstrap() {
   app.use("/api", createVideoRouter());
   app.use("/api", createAiVideoRouter());
   app.use("/api", createReelRouter());
+  app.use("/api", createHyperframesRouter());
   app.use("/api", createVideoStudioRouter());
   app.use("/api", createSocialRouter());
   app.use("/api", createAiProvidersRouter());
   app.use("/api", createOllamaRouter());
+  app.use("/api", createImageGenRouter());
 
   const httpServer = http.createServer(app);
 

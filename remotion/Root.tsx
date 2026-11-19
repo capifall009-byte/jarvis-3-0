@@ -2,6 +2,7 @@ import { Composition } from "remotion";
 import { InstagramReel } from "./reel/InstagramReel";
 import { Story } from "./story/Story";
 import { Serial } from "./serial/Serial";
+import { Horror } from "./horror/Horror";
 import {
   STORY_FPS,
   STORY_HEIGHT,
@@ -14,6 +15,12 @@ import {
   SERIAL_TOTAL_FRAMES,
   SERIAL_WIDTH,
 } from "./serial/timeline";
+import {
+  HORROR_FPS,
+  HORROR_HEIGHT,
+  HORROR_TOTAL_FRAMES,
+  HORROR_WIDTH,
+} from "./horror/timeline";
 import { FPS, HEIGHT, TOTAL_FRAMES, WIDTH } from "./reel/timeline";
 import { JarvisVideo } from "./video/JarvisVideo";
 import { calculateJarvisVideoMetadata } from "./video/metadata";
@@ -49,6 +56,14 @@ export const RemotionRoot: React.FC = () => {
         fps={SERIAL_FPS}
         width={SERIAL_WIDTH}
         height={SERIAL_HEIGHT}
+      />
+      <Composition
+        id="Horror"
+        component={Horror}
+        durationInFrames={HORROR_TOTAL_FRAMES}
+        fps={HORROR_FPS}
+        width={HORROR_WIDTH}
+        height={HORROR_HEIGHT}
       />
 
       {/* Générateur vidéo JARVIS : scénario JSON, 9:16 et 16:9 */}

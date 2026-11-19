@@ -18,7 +18,7 @@ interface AiHubViewProps {
   isOnline: boolean;
 }
 
-const CORE_ORDER: AiProviderId[] = ["gemini", "chatgpt", "claude", "deepseek", "perplexity", "llama"];
+const VISIBLE_CORE_IDS: AiProviderId[] = ["gemini"];
 const OLLAMA_CHAT_ORDER = ["ollama:qwen2.5:0.5b", "ollama:qwen2.5:1.5b", "ollama:qwen2.5:3b"];
 
 type TestState = {
@@ -184,11 +184,12 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
     try {
       const items = await fetchAiProviders();
       setProviders(items);
-      // Keep stored selection if still present, else fallback to gemini
-      const hasSelected = items.some((p) => p.id === selected);
-      if (!hasSelected) {
-        const gemini = items.find((p) => p.id === "gemini");
-        if (gemini) persistSelection(mode, gemini.id);
+      // Sécuriser la sélection stockée si elle pointe vers un fournisseur masqué
+      const safeSelected = (selected === "gemini" || String(selected).startsWith("ollama:")) ? selected : "gemini";
+      const hasSelected = items.some((p) => p.id === safeSelected);
+      if (!hasSelected || safeSelected !== selected) {
+        const fallback = items.find((p) => p.id === "gemini")?.id || "gemini";
+        persistSelection(mode, hasSelected ? safeSelected : fallback);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de chargement.");
@@ -203,8 +204,9 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
   }, []);
 
   const coreProviders = useMemo(() => {
-    const core = providers.filter((p) => !isOllamaProvider(p));
-    return [...core].sort((a, b) => CORE_ORDER.indexOf(a.id as any) - CORE_ORDER.indexOf(b.id as any));
+    // Interface simplifiée : afficher uniquement Gemini comme cerveau principal.
+    // Les fournisseurs non configurés (ChatGPT, Claude, DeepSeek, Perplexity, Llama) sont masqués de l'UI/sélection visible.
+    return VISIBLE_CORE_IDS.map((id) => providers.find((p) => p.id === id)).filter(Boolean) as AiProviderInfo[];
   }, [providers]);
 
   const ollamaProviders = useMemo(() => {
@@ -273,7 +275,7 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
         <header className="space-y-1">
           <h1 className={`font-display text-xl sm:text-2xl font-medium ${extremeDark ? "text-slate-200" : "text-cyan-50"}`}>Intelligences artificielles</h1>
           <p className={`text-sm ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
-            AI Hub multi-fournisseurs. Gemini reste le cerveau principal de JARVIS. Modèles Ollama locaux intégrés (Qwen, Moondream) avec statuts réels. Budget strict : 0 € — aucune API payante appelée.
+            Configuration simplifiée : Gemini cerveau principal, Ollama/Qwen 2.5 en secours local, Moondream pour la vision locale. Statuts réels, budget 0 € — aucune API payante.
           </p>
         </header>
 
@@ -317,7 +319,7 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
         ) : (
           <>
             <section className="space-y-3">
-              <h2 className={`text-sm font-medium ${extremeDark ? "text-slate-200" : "text-cyan-100"}`}>Fournisseurs IA (6 IA)</h2>
+              <h2 className={`text-sm font-medium ${extremeDark ? "text-slate-200" : "text-cyan-100"}`}>Cerveau principal</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {coreProviders.map((p) => (
                   <ProviderCard
@@ -331,12 +333,13 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
                   />
                 ))}
               </div>
+              <p className="text-[11px] text-slate-500">Gemini est le cerveau principal. Les fournisseurs non configurés (ChatGPT, Claude, DeepSeek, Perplexity, Llama) sont masqués. Ollama/Qwen 2.5 assure le secours local.</p>
             </section>
 
             <section className="space-y-3">
-              <h2 className={`text-sm font-medium flex items-center gap-2 ${extremeDark ? "text-slate-200" : "text-cyan-100"}`}><Eye className="w-4 h-4" />Modèles locaux Ollama (détectés)</h2>
+              <h2 className={`text-sm font-medium flex items-center gap-2 ${extremeDark ? "text-slate-200" : "text-cyan-100"}`}><Eye className="w-4 h-4" />Modèles locaux Ollama (secours & vision)</h2>
               <p className={`text-xs ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
-                Qwen 2.5 (0.5B/1.5B/3B) : modèles conversationnels locaux. Moondream : analyse d&apos;images locale (si capacités réelles). Aucune confusion avec ChatGPT/Claude/DeepSeek.
+                Qwen 2.5 (0.5B/1.5B/3B) : modèles conversationnels locaux de secours. Moondream : analyse d&apos;images locale (vision réelle si disponible).
               </p>
               {ollamaProviders.length === 0 ? (
                 <div className={`${card} text-sm text-slate-400`}>Aucun modèle Ollama cible détecté. Vérifiez qu&apos;Ollama est lancé (http://localhost:11434).</div>
@@ -372,7 +375,7 @@ export function AiHubView({ extremeDark, isOnline }: AiHubViewProps) {
           </p>
           <p className="text-xs text-slate-400 leading-relaxed">{selectionResult.reason}</p>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Gemini reste le cerveau principal. Les modèles Qwen locaux (Ollama) servent d&apos;alternative conversationnelle lorsque Gemini est indisponible ou si sélectionnés manuellement. ChatGPT, Claude, DeepSeek, Perplexity : adaptateurs préparés, non opérationnels sans accès/clé gratuite validée. Aucune API payante n&apos;est appelée.
+            Gemini reste le cerveau principal. Ollama avec Qwen 2.5 sert de solution locale de secours pour la conversation ; Moondream peut assurer l'analyse d'images en local lorsque disponible. Les fournisseurs non configurés sont masqués de l'interface. Aucune API payante n'est appelée.
           </p>
         </section>
       </div>

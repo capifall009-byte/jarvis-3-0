@@ -36,8 +36,10 @@ interface NavShellProps {
   onNewSession: () => void;
   onOpenHistory: () => void;
   children: ReactNode;
-  /** Sidebar conversationnelle optionnelle (desktop). */
+  /** Sidebar unifiée (desktop). */
   sidebarSlot?: ReactNode;
+  /** Sidebar unifiée (tiroir mobile compact). Peut être un nœud ou une fonction recevant onClose. */
+  mobileSidebarSlot?: ReactNode | ((onClose: () => void) => ReactNode);
 }
 
 interface NavItem {
@@ -86,6 +88,7 @@ export function NavShell({
   onOpenHistory,
   children,
   sidebarSlot,
+  mobileSidebarSlot,
 }: NavShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -286,41 +289,53 @@ export function NavShell({
           </div>
         </nav>
 
-        {/* Mobile slide-over menu */}
+        {/* Mobile slide-over menu (sidebar unifiée) */}
         {mobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-50">
             <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-label="Fermer le menu" onClick={() => setMobileMenuOpen(false)} />
-            <div className={`absolute inset-y-0 left-0 w-[min(86vw,320px)] border-r flex flex-col ${extremeDark ? "bg-black border-white/[0.08]" : "bg-[#040916] border-cyan-400/15"}`}>
-              <div className="h-14 px-4 flex items-center justify-between border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg grid place-items-center bg-cyan-500/15 border border-cyan-400/20"><span className="text-sm font-display font-semibold text-cyan-300">J</span></div>
-                  <span className="font-display text-slate-100">JARVIS 3.0</span>
+            <div className={`absolute inset-y-0 left-0 w-[min(88vw,340px)] border-r flex flex-col overflow-hidden ${extremeDark ? "bg-black border-white/[0.08]" : "bg-[#040916] border-cyan-400/15"}`}>
+              {mobileSidebarSlot ? (
+                <div className="h-full min-h-0">
+                  {typeof mobileSidebarSlot === "function"
+                    ? mobileSidebarSlot(() => setMobileMenuOpen(false))
+                    : mobileSidebarSlot}
                 </div>
-                <button type="button" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 grid place-items-center rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer" aria-label="Fermer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <nav className="flex-1 overflow-y-auto p-3 space-y-1 jarvis-scroll" aria-label="Menu principal">
-                {NAV_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  const selected = isItemActive(item);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => runItem(item)}
-                      className={`w-full flex items-center gap-3 min-h-[44px] px-3.5 rounded-xl border text-sm text-left cursor-pointer ${
-                        selected
-                          ? "bg-cyan-500/15 border-cyan-400/30 text-cyan-100"
-                          : "border-transparent text-slate-300 hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0 text-cyan-300/80" />
-                      <span>{item.label}</span>
+              ) : sidebarSlot ? (
+                <div className="h-full min-h-0">{sidebarSlot}</div>
+              ) : (
+                <>
+                  <div className="h-14 px-4 flex items-center justify-between border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg grid place-items-center bg-cyan-500/15 border border-cyan-400/20"><span className="text-sm font-display font-semibold text-cyan-300">J</span></div>
+                      <span className="font-display text-slate-100">JARVIS 3.0</span>
+                    </div>
+                    <button type="button" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 grid place-items-center rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer" aria-label="Fermer">
+                      <X className="w-5 h-5" />
                     </button>
-                  );
-                })}
-              </nav>
+                  </div>
+                  <nav className="flex-1 overflow-y-auto p-3 space-y-1 jarvis-scroll" aria-label="Menu principal">
+                    {NAV_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      const selected = isItemActive(item);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => runItem(item)}
+                          className={`w-full flex items-center gap-3 min-h-[44px] px-3.5 rounded-xl border text-sm text-left cursor-pointer ${
+                            selected
+                              ? "bg-cyan-500/15 border-cyan-400/30 text-cyan-100"
+                              : "border-transparent text-slate-300 hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 shrink-0 text-cyan-300/80" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -8,6 +8,7 @@ import {
   Loader2,
   RefreshCw,
   Smartphone,
+  Sparkles,
 } from "lucide-react";
 import {
   cancelReelRender,
@@ -21,7 +22,9 @@ import {
 import { FPS, SCENES, TOTAL_FRAMES, WIDTH, HEIGHT } from "../../../remotion/reel/timeline";
 import { STORY_FPS, STORY_SCENES } from "../../../remotion/story/timeline";
 import { SERIAL_FPS, SERIAL_SCENES } from "../../../remotion/serial/timeline";
+import { HORROR_FPS, HORROR_SCENES } from "../../../remotion/horror/timeline";
 import { VideoGeneratorPanel } from "./VideoGeneratorPanel";
+import { HyperframesPanel } from "./HyperframesPanel";
 
 interface ReelStudioViewProps {
   extremeDark: boolean;
@@ -59,6 +62,17 @@ const SERIAL_SCENE_LABELS: Record<string, string> = {
   s8: "Vote — répondre ou laisser sonner",
 };
 
+const HORROR_SCENE_LABELS: Record<string, string> = {
+  s1: "Journal — 3 % de batterie",
+  s2: "Ascenseurs hors service",
+  s3: "Ça a commencé au 4e étage",
+  s4: "Un cri, puis des pas",
+  s5: "Je filme depuis le placard",
+  s6: "Il s'arrête. Il respire.",
+  s7: "Il a dit mon prénom",
+  s8: "Vote — ouvrir ou rester caché",
+};
+
 function formatBytes(bytes: number): string {
   if (!bytes) return "—";
   const mb = bytes / (1024 * 1024);
@@ -77,6 +91,7 @@ export function ReelStudioView({ extremeDark, isOnline }: ReelStudioViewProps) {
   const [job, setJob] = useState<ReelRenderJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [engine, setEngine] = useState<"remotion" | "hyperframes">("remotion");
 
   const card = `rounded-2xl border p-4 ${
     extremeDark ? "bg-black border-white/[0.06]" : "jarvis-glass border-cyan-400/15"
@@ -139,7 +154,18 @@ export function ReelStudioView({ extremeDark, isOnline }: ReelStudioViewProps) {
     compositions.find((item) => item.id === selectedCompositionId) ?? compositions[0];
   const isStory = selectedComposition?.id === "DernierSignal";
   const isSerial = selectedComposition?.id === "JourUn";
-  const timeline = isStory
+  const isHorror = selectedComposition?.id === "Horror";
+  const timeline = isHorror
+    ? HORROR_SCENES.map((scene) => ({
+        id: scene.id,
+        from: scene.from,
+        to: scene.to,
+        duration: scene.duration,
+        label: HORROR_SCENE_LABELS[scene.id] ?? scene.id,
+        fps: HORROR_FPS,
+        total: HORROR_SCENES.length * scene.duration,
+      }))
+    : isStory
     ? STORY_SCENES.map((scene) => ({
         id: scene.id,
         from: scene.from,
@@ -202,12 +228,51 @@ export function ReelStudioView({ extremeDark, isOnline }: ReelStudioViewProps) {
             Studio vidéo
           </h1>
           <p className={`text-sm ${muted}`}>
-            Crée une vidéo avec JARVIS (script Gemini, voix off, rendu Remotion 9:16 / 16:9),
-            puis choisis une composition à rendre ci-dessous.
+            Crée une vidéo avec JARVIS (script Gemini, voix off), puis choisis le moteur de
+            rendu : Remotion ou Hyperframes.
           </p>
         </header>
 
-        <VideoGeneratorPanel extremeDark={extremeDark} isOnline={isOnline} />
+        <section className={`${card} space-y-3`}>
+          <div>
+            <h2 className={`text-sm font-medium ${extremeDark ? "text-slate-200" : "text-cyan-50"}`}>
+              Moteur vidéo
+            </h2>
+            <p className={`text-xs ${muted}`}>
+              Choisis le moteur utilisé pour produire le MP4.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEngine("remotion")}
+              className={`inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-xl border text-sm cursor-pointer ${
+                engine === "remotion"
+                  ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
+                  : "border-white/[0.08] text-slate-300 hover:bg-white/5"
+              }`}
+            >
+              <Film className="w-4 h-4" />
+              Remotion
+            </button>
+            <button
+              type="button"
+              onClick={() => setEngine("hyperframes")}
+              className={`inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-xl border text-sm cursor-pointer ${
+                engine === "hyperframes"
+                  ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
+                  : "border-white/[0.08] text-slate-300 hover:bg-white/5"
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              Hyperframes
+            </button>
+          </div>
+        </section>
+
+        {engine === "remotion" ? (
+          <>
+            <VideoGeneratorPanel extremeDark={extremeDark} isOnline={isOnline} />
 
         <section className={`${card} space-y-3`}>
           <div>
@@ -429,13 +494,19 @@ export function ReelStudioView({ extremeDark, isOnline }: ReelStudioViewProps) {
                 </div>
               )}
               <p className={`text-[11px] leading-relaxed ${muted}`}>
-                Pour modifier le contenu : <code>remotion/reel/scenes.tsx</code> (Reel) ou{" "}
-                <code>remotion/story/scenes-*.tsx</code> et <code>timeline.ts</code> (Le Dernier Signal).
-                Régénère la voix avec <code>npm run story:audio</code> si le texte change.
+                Contenu : <code>remotion/reel/</code>, <code>remotion/story/</code> ou{" "}
+                <code>remotion/serial/</code>. Régénère la voix avec{" "}
+                <code>npm run reel:audio</code>, <code>story:audio</code> ou{" "}
+                <code>serial:audio</code> selon la composition.
               </p>
             </section>
           </div>
         </div>
+          </>
+        ) : null}
+        {engine === "hyperframes" && (
+          <HyperframesPanel extremeDark={extremeDark} isOnline={isOnline} />
+        )}
       </div>
     </div>
   );

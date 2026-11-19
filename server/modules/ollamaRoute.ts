@@ -135,8 +135,8 @@ function capText(value: unknown, max: number): string {
 
 function buildOllamaMessages(body: any): Array<{ role: "system" | "user" | "assistant"; content: string; images?: string[] }> {
   const message = capText(body?.message, 8000);
-  const history = Array.isArray(body?.history) ? body.history.slice(-14) : [];
-  const memories = Array.isArray(body?.memories) ? body.memories.slice(0, 50) : [];
+  const history = Array.isArray(body?.history) ? body.history.slice(-10) : [];
+  const memories = Array.isArray(body?.memories) ? body.memories.slice(0, 40) : [];
   const mode = body?.mode;
   const intelligenceProfile = body?.intelligenceProfile;
   const projects = Array.isArray(body?.projects) ? body.projects : [];
@@ -144,7 +144,8 @@ function buildOllamaMessages(body: any): Array<{ role: "system" | "user" | "assi
   const sentiment = analyzeUserSentiment(message, recentUserMessages);
 
   // Réutilisation du prompt système JARVIS (mémoire centrale, règles, identité) pour cohérence.
-  const systemInstruction = buildJarvisSystemInstruction(
+  // Limité en taille pour rester utilisable avec les petits modèles locaux (Qwen 0.5B/1.5B/3B).
+  let systemInstruction = buildJarvisSystemInstruction(
     memories as MemoryContextItem[],
     sentiment,
     mode,
@@ -153,6 +154,9 @@ function buildOllamaMessages(body: any): Array<{ role: "system" | "user" | "assi
     projects,
     body?.timeContext
   );
+  if (systemInstruction.length > 14000) {
+    systemInstruction = systemInstruction.slice(0, 13980) + "\n[… contexte abrégé pour modèle local …]";
+  }
 
   const msgs: Array<{ role: "system" | "user" | "assistant"; content: string; images?: string[] }> = [
     { role: "system", content: systemInstruction },
@@ -161,7 +165,7 @@ function buildOllamaMessages(body: any): Array<{ role: "system" | "user" | "assi
     if (!h?.text || !String(h.text).trim()) continue;
     msgs.push({
       role: h.role === "assistant" ? "assistant" : "user",
-      content: capText(h.text, 4000),
+      content: capText(h.text, 3000),
     });
   }
   msgs.push({ role: "user", content: message });
@@ -217,20 +221,21 @@ export function createOllamaRouter(): Router {
       res.status(400).json({ error: `Le modèle ${model} n'est pas configuré comme modèle conversationnel.`, model });
       return;
     }
-    if (target && !target.available) {
+    if (target && !target.available && detected.reachable) {
       res.status(503).json({ error: `Modèle Ollama indisponible: ${model}.`, note: target.note, model });
       return;
     }
+    const effectiveModel = target?.ollamaName || model;
     const messages = buildOllamaMessages(body);
     // Cap output reasonably for small local models
-    const result = await ollamaChatNonStream(target?.ollamaName || model, messages, { temperature: 0.4 });
+    const result = await ollamaChatNonStream(effectiveModel, messages, { temperature: 0.4 });
     if (!result.ok) {
-      res.status(result.status >= 400 ? result.status : 502).json({ error: result.error || "Erreur Ollama", model, responseMs: result.ms });
+      res.status(result.status >= 400 ? result.status : 502).json({ error: result.error || "Erreur Ollama", model: effectiveModel, responseMs: result.ms, detectionError: detected.error || null });
       return;
     }
     res.json({
       reply: (result.content || "").trim() || "(Réponse vide du modèle)",
-      model: target?.ollamaName || model,
+      model: effectiveModel,
       provider: "ollama",
       responseMs: result.ms,
     });
@@ -249,7 +254,7 @@ export function createOllamaRouter(): Router {
     const detected = await detectOllamaTargetModels();
     const target = detected.models.find((m) => m.ollamaName === model || m.id === model || (model.startsWith("moondream") && m.family === "moondream"));
     const effectiveModel = target?.ollamaName || model;
-    if (target && !target.available) {
+    if (target && !target.available && detected.reachable) {
       res.status(503).json({ error: `Modèle vision Ollama indisponible: ${effectiveModel}.`, note: target.note, model: effectiveModel });
       return;
     }
@@ -260,7 +265,7 @@ export function createOllamaRouter(): Router {
     ];
     const result = await ollamaChatNonStream(effectiveModel, messages as any, { temperature: 0.2 });
     if (!result.ok) {
-      res.status(result.status >= 400 ? result.status : 502).json({ error: result.error || "Erreur Ollama vision", model: effectiveModel, responseMs: result.ms });
+      res.status(result.status >= 400 ? result.status : 502).json({ error: result.error || "Erreur Ollama vision", model: effectiveModel, responseMs: result.ms, detectionError: detected.error || null });
       return;
     }
     res.json({
@@ -286,27 +291,28 @@ export function createOllamaRouter(): Router {
       res.status(404).json({ error: "Modèle cible non reconnu.", model });
       return;
     }
-    if (!target.available) {
+    if (!target.available && detected.reachable) {
       res.json({ ok: false, model: target.ollamaName, displayName: target.displayName, status: "unavailable", error: target.note });
       return;
     }
+    const effectiveModel = target.ollamaName || model;
     if (target.kind === "vision") {
       // Vision test requires an image; if not provided, report capability/status honestly.
       const imageData = String(body.image || body.imageBase64 || "").trim();
       if (!imageData) {
-        res.json({ ok: false, model: target.ollamaName, displayName: target.displayName, status: "needs_image", note: "Test vision réel: fournissez une image (base64) pour tester l'analyse.", capability: "vision" });
+        res.json({ ok: false, model: effectiveModel, displayName: target.displayName, status: "needs_image", note: "Test vision réel: fournissez une image (base64) pour tester l'analyse.", capability: "vision" });
         return;
       }
       const prompt = capText(body.prompt || "Décris brièvement cette image.", 1000);
       const base64 = imageData.replace(/^data:[^;]+;base64,/, "");
-      const result = await ollamaChatNonStream(target.ollamaName, [{ role: "user", content: prompt, images: [base64] }] as any, { temperature: 0.2 });
-      res.json({ ok: result.ok, model: target.ollamaName, displayName: target.displayName, capability: "vision", responseMs: result.ms, reply: result.ok ? (result.content || "").slice(0, 500) : undefined, error: result.ok ? undefined : result.error });
+      const result = await ollamaChatNonStream(effectiveModel, [{ role: "user", content: prompt, images: [base64] }] as any, { temperature: 0.2 });
+      res.json({ ok: result.ok, model: effectiveModel, displayName: target.displayName, capability: "vision", responseMs: result.ms, reply: result.ok ? (result.content || "").slice(0, 500) : undefined, error: result.ok ? undefined : (result.error + (detected.error && !detected.reachable ? ` (détection: ${detected.error})` : "")) });
       return;
     }
     // Chat test
     const prompt = capText(body.prompt || "Réponds uniquement par: OK", 500);
-    const result = await ollamaChatNonStream(target.ollamaName, [{ role: "user", content: prompt }], { temperature: 0.1 });
-    res.json({ ok: result.ok, model: target.ollamaName, displayName: target.displayName, capability: "chat", responseMs: result.ms, reply: result.ok ? (result.content || "").slice(0, 500) : undefined, error: result.ok ? undefined : result.error });
+    const result = await ollamaChatNonStream(effectiveModel, [{ role: "user", content: prompt }], { temperature: 0.1 });
+    res.json({ ok: result.ok, model: effectiveModel, displayName: target.displayName, capability: "chat", responseMs: result.ms, reply: result.ok ? (result.content || "").slice(0, 500) : undefined, error: result.ok ? undefined : (result.error + (detected.error && !detected.reachable ? ` (détection: ${detected.error})` : "")) });
   });
 
   return router;

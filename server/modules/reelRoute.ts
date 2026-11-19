@@ -54,6 +54,15 @@ const COMPOSITIONS: ReelComposition[] = [
     fps: 30,
     durationSec: 48,
   },
+  {
+    id: "Horror",
+    label: "JOUR 1 · Le couloir — horreur (48 s)",
+    slug: "horreur-couloir",
+    width: 1080,
+    height: 1920,
+    fps: 30,
+    durationSec: 48,
+  },
 ];
 
 const DEFAULT_COMPOSITION_ID = COMPOSITIONS[0].id;

@@ -24,8 +24,6 @@ export interface JarvisVideoScene {
 export interface JarvisVideoProps {
   /** Remotion 4 exige un objet de props indexable par clé. */
   [key: string]: unknown;
-  /** Remotion 4 exige un objet de props indexable par clé. */
-  [key: string]: unknown;
   title: string;
   kicker: string;
   accent: "cyan" | "violet" | "amber";

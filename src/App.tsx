@@ -47,7 +47,7 @@ import {
   type AppPreferences,
 } from "./services/preferences/AppPreferences";
 import { streamGeminiResponse, extractMemoryTags } from "./services/gemini/GeminiClient";
-import { chatWithOllama } from "./services/ai/AiProvidersClient";
+import { analyzeImageWithOllama, chatWithOllama } from "./services/ai/AiProvidersClient";
 import { getStoredAiSelection, loadAiProviderRegistry, selectAiProvider } from "./services/ai/AiProviderManager";
 import { detectSensitiveMemory, memoryRepository } from "./services/memory/MemoryRepository";
 import {
@@ -92,6 +92,7 @@ import {
 import type { JarvisTone, SentimentAnalysis } from "../shared/sentiment.ts";
 import type {
   AppView,
+  ChatAttachment,
   ConnectionErrorInfo,
   ConversationSession,
   CustomMode,
@@ -536,9 +537,11 @@ export default function App() {
   }, [stopAllActivity]);
 
   const submitToGemini = useCallback(
-    async (text: string, source: "voice" | "text") => {
+    async (text: string, source: "voice" | "text", attachments?: ChatAttachment[]) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
+      const safeAttachments = Array.isArray(attachments) ? attachments.slice(0, 8) : [];
+      const hasAttachments = safeAttachments.length > 0;
+      if (!trimmed && !hasAttachments) return;
 
       requestAbortRef.current?.abort();
       audioEngineRef.current?.stopPlayback();
@@ -550,7 +553,7 @@ export default function App() {
       const recentUserTexts = priorMessages
         .filter((m) => m.role === "user")
         .map((m) => m.text);
-      const instantSentiment = analyzeUserSentiment(trimmed, recentUserTexts);
+      const instantSentiment = analyzeUserSentiment(trimmed || "pièces jointes", recentUserTexts);
 
       const userMsg: TranscriptMessage = {
         id: createMsgId(),
@@ -559,14 +562,46 @@ export default function App() {
         timestamp: Date.now(),
         source,
         sentiment: instantSentiment,
+        attachments: hasAttachments ? safeAttachments : undefined,
       };
       const assistantMsgId = createMsgId();
 
       updateSessionMessages(sessionId, (msgs) => [...msgs, userMsg]);
 
+      const detectImageGenerationIntent = (msg: string, atts: ChatAttachment[]) => {
+        const t = (msg || "").toLowerCase();
+        const hasInputImages = atts.some((a) => a.kind === "image" || (a.mimeType || "").startsWith("image/"));
+        const genVerbs = /(g[eé]n[eè]re|g[eé]n[eé]rer|cr[eé]e|cr[eé]er|dessine|dessiner|fabrique|produis|fais[- ]moi|peins|illustre)/i;
+        const imageNoun = /(image|illustration|visuel|logo|affiche|dessin|photo|wallpaper|fond d['’]?[eé]cran)/i;
+        const explicit = /\/image\b|!image\b/i.test(msg || "");
+        const asksModify = /(modifie|modifier|change|changer|am[eé]liore|retravaille|variation|autre version|refais)/i.test(msg || "");
+        const wantsNewImage = explicit || (genVerbs.test(t) && imageNoun.test(t));
+        // Si des images sont jointes, on privilégie l'analyse/modification par IA sauf demande explicite de génération nouvelle.
+        if (hasInputImages && !explicit && !(/\bnouvelle image\b|\bune autre image\b|\bg[eé]n[eè]re une image\b/i.test(msg || ""))) {
+          return { isGen: false, prompt: msg, wantsModify: asksModify };
+        }
+        return { isGen: wantsNewImage, prompt: msg, wantsModify: asksModify && wantsNewImage };
+      };
+
+      const genIntent = detectImageGenerationIntent(trimmed, safeAttachments);
+
       // Honest Offline Mode: execute local commands, never pretend Gemini works offline
       if (!isOnlineRef.current) {
-        const offlineResult = executeOfflineCommand(trimmed, {
+        if (genIntent.isGen) {
+          updateSessionMessages(sessionId, (msgs) => [
+            ...msgs,
+            {
+              id: assistantMsgId,
+              role: "assistant",
+              text: "La génération d'images nécessite une connexion réseau (service Pollinations.ai gratuit). Réessayez lorsque vous serez en ligne.",
+              timestamp: Date.now(),
+              source: "text",
+              tone: "calm",
+            },
+          ]);
+          return;
+        }
+        const offlineResult = executeOfflineCommand(trimmed || "pièces jointes", {
           memories: memoriesRef.current,
           sessions: sessionsRef.current,
           files: storedFilesRef.current,
@@ -574,13 +609,13 @@ export default function App() {
             setIsExtremeDark((prev) => (typeof force === "boolean" ? force : !prev)),
           onNewSession: handleNewSession,
         });
-
+        const attachNote = hasAttachments ? "\n\n[Pièces jointes reçues mais non analysées : l'analyse d'images/fichiers par IA est indisponible hors ligne.]" : "";
         updateSessionMessages(sessionId, (msgs) => [
           ...msgs,
           {
             id: assistantMsgId,
             role: "assistant",
-            text: offlineResult.reply,
+            text: (offlineResult.reply || "Mode hors ligne.") + attachNote,
             timestamp: Date.now(),
             source: "text",
             tone: "calm",
@@ -590,8 +625,57 @@ export default function App() {
         const engine = audioEngineRef.current;
         if (engine && !engine.getMuted()) {
           const genId = engine.beginSpeechTurn("calm");
-          engine.enqueueSentence(offlineResult.reply, genId);
+          engine.enqueueSentence((offlineResult.reply || "Mode hors ligne.").slice(0, 300), genId);
           engine.markStreamComplete(genId);
+        }
+        return;
+      }
+
+      // Génération d'images réelle (Pollinations.ai, 0€) si demandée explicitement
+      if (genIntent.isGen) {
+        setIsSending(true);
+        setVoiceState("thinking");
+        try {
+          const prompt = (trimmed || "").replace(/^\/image\s*/i, "").replace(/^!image\s*/i, "").trim() || "image créative";
+          const style = /futur/i.test(prompt) ? "futuristic" : /r[eé]al/i.test(prompt) ? "realistic" : /artist|peint/i.test(prompt) ? "artistic" : /pro|corpor/i.test(prompt) ? "professional" : undefined;
+          const resp = await fetch("/api/images/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, style }),
+          });
+          const data = await resp.json().catch(() => ({} as any));
+          if (!resp.ok || !data?.ok || !data?.url) {
+            const errMsg = (data && (data.error || data.message)) || `Échec de génération (${resp.status}).`;
+            updateSessionMessages(sessionId, (msgs) => [
+              ...msgs,
+              { id: assistantMsgId, role: "assistant", text: `Génération d'image impossible : ${errMsg}`, timestamp: Date.now(), source: "text", tone: "calm" },
+            ]);
+            return;
+          }
+          const imgUrl = String(data.url);
+          const reply = `Image générée à partir de votre demande${data.style ? ` (style ${data.style})` : ""} via Pollinations.ai (0€). Vous pouvez la télécharger ou me demander une modification (nouvelle version générée avec un prompt ajusté).`;
+          updateSessionMessages(sessionId, (msgs) => [
+            ...msgs,
+            {
+              id: assistantMsgId,
+              role: "assistant",
+              text: reply,
+              timestamp: Date.now(),
+              source: "text",
+              tone: "calm",
+              generatedImages: [{ id: createMsgId(), url: imgUrl, prompt: String(data.finalPrompt || data.prompt || prompt) }],
+              providerLabel: "Pollinations.ai (0€)",
+            },
+          ]);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Erreur inconnue lors de la génération.";
+          updateSessionMessages(sessionId, (msgs) => [
+            ...msgs,
+            { id: assistantMsgId, role: "assistant", text: `Génération d'image échouée : ${msg}`, timestamp: Date.now(), source: "text", tone: "calm" },
+          ]);
+        } finally {
+          setIsSending(false);
+          if (voiceStateRef.current === "thinking") setVoiceState("idle");
         }
         return;
       }
@@ -681,7 +765,7 @@ export default function App() {
         }
       };
 
-      const finalizeAssistantReply = (reply: string, tone: JarvisTone, modelName: string | null, extractedMemories: string[]) => {
+      const finalizeAssistantReply = (reply: string, tone: JarvisTone, modelName: string | null, extractedMemories: string[], providerLabel?: string) => {
         const finalTone = tone || resolvedTurnTone;
         resolvedTurnTone = finalTone;
         setActiveTone(finalTone);
@@ -701,6 +785,7 @@ export default function App() {
               source: engine && !engine.getMuted() ? "voice" : "text",
               isPartial: false,
               tone: finalTone,
+              providerLabel: providerLabel || (modelName ? String(modelName) : undefined),
             },
           ]);
         } else {
@@ -713,6 +798,7 @@ export default function App() {
                     text: reply,
                     isPartial: false,
                     tone: finalTone,
+                    providerLabel: providerLabel || m.providerLabel || (modelName ? String(modelName) : undefined),
                   }
                 : m
             )
@@ -750,14 +836,62 @@ export default function App() {
         }
       };
 
-      const runOllamaChat = async (brainCtx: any, ollamaModelName: string, displayLabel?: string) => {
+      const runOllamaChat = async (brainCtx: any, ollamaModelName: string, displayLabel?: string, providersList?: any[]) => {
+        let messageForModel = brainCtx.message as string;
+        const imageAtts = hasAttachments ? safeAttachments.filter((a) => a.kind === "image" || (a.mimeType || "").startsWith("image/")) : [];
+        const nonImageAtts = hasAttachments ? safeAttachments.filter((a) => !(a.kind === "image" || (a.mimeType || "").startsWith("image/"))) : [];
+
+        if (imageAtts.length > 0) {
+          const plist = Array.isArray(providersList) ? providersList : [];
+          const moondream = plist.find((p: any) => (String(p.id).includes("moondream") || String(p.ollamaName || "").includes("moondream")) && p.status === "available" && p.capabilities?.vision);
+          if (moondream) {
+            const analyses: string[] = [];
+            for (let i = 0; i < Math.min(imageAtts.length, 4); i++) {
+              const img = imageAtts[i];
+              const dataUrl = img.dataUrl || img.previewUrl;
+              if (!dataUrl) continue;
+              try {
+                const prompt = trimmed
+                  ? `Analyse cette image en lien avec la demande suivante : "${trimmed}". Décris le contenu, les objets/scènes/éléments visibles, lis le texte présent (OCR) si pertinent, et réponds précisément.`
+                  : "Décris en détail cette image : contenu, objets, scènes, éléments visibles et texte lisible (OCR) si présent.";
+                const vision = await analyzeImageWithOllama({ model: moondream.ollamaName || moondream.model || "moondream:latest", prompt, imageBase64: dataUrl });
+                analyses.push(`Image ${i + 1} (${img.name || "image"}) — analyse Moondream locale:\n${String(vision.reply || "").trim() || "(réponse vide)"}`);
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : "erreur vision";
+                analyses.push(`Image ${i + 1} (${img.name || "image"}) — analyse Moondream échouée: ${msg}`);
+              }
+            }
+            if (analyses.length > 0) {
+              messageForModel = `${messageForModel}\n\n[Analyses d'images réelles effectuées par Moondream (Ollama local)]\n${analyses.join("\n\n")}\n\nUtilise ces analyses pour répondre à la demande. N'invente pas de détails non présents dans les analyses.`;
+            } else {
+              messageForModel = `${messageForModel}\n\n[Images jointes mais aucune analyse vision n'a pu être produite. Réponds honnêtement sur cette limite.]`;
+            }
+          } else {
+            messageForModel = `${messageForModel}\n\n[Images jointes : aucun modèle vision opérationnel disponible en secours (Moondream/Ollama indisponible) et Gemini Vision non utilisé pour cette réponse. Je ne peux pas analyser le contenu visuel sans traitement réel. Explique cette limite honnêtement et propose d'utiliser Gemini (si configuré/disponible) ou de démarrer Ollama avec Moondream pour l'analyse d'images.]`;
+          }
+        }
+
+        if (nonImageAtts.length > 0) {
+          const parts: string[] = [];
+          for (const att of nonImageAtts.slice(0, 6)) {
+            if (att.textContent && att.textContent.trim()) {
+              parts.push(`Fichier ${att.name} (${att.mimeType || att.kind}):\n${att.textContent.slice(0, 12000)}`);
+            } else if ((att.mimeType || "").toLowerCase().includes("pdf") || att.kind === "pdf") {
+              parts.push(`Fichier ${att.name} (PDF) joint sans texte extrait côté client : analyse du contenu binaire non disponible via ce modèle local. Demande à l'utilisateur d'utiliser Gemini (si disponible) pour l'analyse PDF ou de fournir le texte extrait.`);
+            } else {
+              parts.push(`Fichier ${att.name} (${att.mimeType || att.kind}) joint sans contenu textuel exploitable pour ce modèle local.`);
+            }
+          }
+          if (parts.length) messageForModel = `${messageForModel}\n\n[Pièces jointes non-image]\n${parts.join("\n\n")}`;
+        }
+
         const historyForApi = (brainCtx.history || [])
           .filter((m: any) => !m.isPartial && m.text && String(m.text).trim().length > 0)
           .slice(-14)
           .map((m: any) => ({ role: m.role, text: m.text }));
         const resp = await chatWithOllama({
           model: ollamaModelName,
-          message: brainCtx.message,
+          message: messageForModel,
           history: historyForApi,
           memories: brainCtx.memories,
           mode: brainCtx.mode,
@@ -789,11 +923,13 @@ export default function App() {
         }
         const { cleanText, memories: extractedMemories } = extractMemoryTags(withoutTone);
         const label = displayLabel || resp.model || ollamaModelName;
+        const visionUsed = imageAtts.length > 0 && Array.isArray(providersList) && providersList.some((p: any) => (String(p.id).includes("moondream") || String(p.ollamaName || "").includes("moondream")) && p.status === "available" && p.capabilities?.vision);
         finalizeAssistantReply(
           cleanText || "(Réponse vide du modèle)",
           tone,
-          `ollama:${label}`,
-          extractedMemories || []
+          visionUsed ? `${label} (+ Moondream vision)` : `ollama:${label}`,
+          extractedMemories || [],
+          visionUsed ? `${label} + Moondream (vision locale)` : label
         );
         return { aborted: false as const };
       };
@@ -832,6 +968,7 @@ export default function App() {
             intelligenceProfile: brainCtx.intelligenceProfile,
             projects: brainCtx.projects,
             userTimeZone: brainCtx.userTimeZone,
+            attachments: hasAttachments ? safeAttachments : undefined,
             signal: controller.signal,
             onMeta: (model, serverSentiment) => {
               if (model) setGeminiModel(model);
@@ -892,7 +1029,7 @@ export default function App() {
           });
 
           if (controller.signal.aborted) return { aborted: true as const };
-          finalizeAssistantReply(result.reply, result.tone || resolvedTurnTone, result.model, result.extractedMemories || []);
+          finalizeAssistantReply(result.reply, result.tone || resolvedTurnTone, result.model, result.extractedMemories || [], result.model ? `Gemini (${result.model})` : "Gemini");
           return { aborted: false as const };
         };
 
@@ -920,7 +1057,7 @@ export default function App() {
           resolved.status === "available";
 
         if (isOllamaChat) {
-          const out = await runOllamaChat(brainCtx, resolved.ollamaName || resolved.model || String(resolved.id), resolved.name || resolved.ollamaName);
+          const out = await runOllamaChat(brainCtx, resolved.ollamaName || resolved.model || String(resolved.id), resolved.name || resolved.ollamaName, providers);
           if ((out as any)?.aborted) return;
         } else {
           try {
@@ -949,7 +1086,7 @@ export default function App() {
                   )
                 );
               }
-              const out = await runOllamaChat(brainCtx, ollamaAlt.ollamaName || ollamaAlt.model || String(ollamaAlt.id), ollamaAlt.name || ollamaAlt.ollamaName);
+              const out = await runOllamaChat(brainCtx, ollamaAlt.ollamaName || ollamaAlt.model || String(ollamaAlt.id), ollamaAlt.name || ollamaAlt.ollamaName, providers);
               if ((out as any)?.aborted) return;
             } else {
               throw geminiErr;
@@ -1075,12 +1212,12 @@ export default function App() {
   }, [handleToggleMic, stopAllActivity]);
 
   const handleSendText = useCallback(
-    (text: string) => {
+    (text: string, attachments?: ChatAttachment[]) => {
       audioEngineRef.current?.prepareOnUserGesture();
       speechInputRef.current?.stop();
       setInterimTranscript("");
       setSiriListenPending(false);
-      void submitToGemini(text, "text");
+      void submitToGemini(text, "text", attachments);
     },
     [submitToGemini]
   );
@@ -1413,6 +1550,22 @@ export default function App() {
           onOpenHistory={() => setIsDrawerOpen(true)}
         />
       }
+      mobileSidebarSlot={(onClose) => (
+        <ChatSidebar
+          compact
+          onClose={onClose}
+          extremeDark={isExtremeDark}
+          activeView={activeView}
+          onSelectView={setActiveView}
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession}
+          onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onOpenHistory={() => setIsDrawerOpen(true)}
+        />
+      )}
     >
       {/* Global Banners */}
       {errorInfo && (

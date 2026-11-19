@@ -248,7 +248,7 @@ export const SceneVote: React.FC = () => {
 
         <Vignette />
         <Grain />
-        <Subtitle text="Vote : répondre, ou laisser sonner. Abonne-toi pour le jour deux." bottom={150} size={42} />
+        <Subtitle text="Vote : répondre ou laisser sonner. À demain pour le jour deux." bottom={150} size={42} />
       </AbsoluteFill>
     </SceneFade>
   );

@@ -243,6 +243,28 @@ export interface WebResearchResult {
   notes?: string[];
 }
 
+export type ChatAttachmentKind = "image" | "pdf" | "document" | "text" | "file";
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  kind: ChatAttachmentKind;
+  /** Data URL (data:...) pour prévisualisation/envoi (images, petits fichiers). */
+  dataUrl?: string;
+  /** Contenu texte extrait/local pour documents texte. */
+  textContent?: string;
+  /** Aperçu réduit (image). */
+  previewUrl?: string;
+  /** Image générée par JARVIS (URL ou data URL). */
+  generatedImageUrl?: string;
+  /** Indique que l'analyse a été effectuée. */
+  analyzed?: boolean;
+  /** Erreur de traitement/validation. */
+  error?: string;
+}
+
 export interface TranscriptMessage {
   id: string;
   role: "user" | "assistant";
@@ -253,6 +275,12 @@ export interface TranscriptMessage {
   sentiment?: SentimentAnalysis;
   tone?: JarvisTone;
   sources?: WebSource[];
+  /** Pièces jointes (images/fichiers) associées au message. */
+  attachments?: ChatAttachment[];
+  /** Images générées et affichées dans la conversation. */
+  generatedImages?: Array<{ id: string; url: string; prompt?: string; alt?: string }>;
+  /** Modèle/fournisseur ayant produit la réponse (affichage informatif). */
+  providerLabel?: string;
 }
 
 export interface ConversationSession {

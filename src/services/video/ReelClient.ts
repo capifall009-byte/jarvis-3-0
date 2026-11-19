@@ -54,6 +54,16 @@ export const DEFAULT_SERIAL_COMPOSITION: ReelComposition = {
   durationSec: 48,
 };
 
+export const DEFAULT_HORROR_COMPOSITION: ReelComposition = {
+  id: "Horror",
+  label: "JOUR 1 · Le couloir — horreur (48 s)",
+  slug: "horreur-couloir",
+  width: 1080,
+  height: 1920,
+  fps: 30,
+  durationSec: 48,
+};
+
 export async function listReels(): Promise<ReelLibrary> {
   const res = await fetch("/api/reels");
   const data = (await res.json()) as ReelLibrary & { error?: string };

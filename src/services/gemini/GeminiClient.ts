@@ -1,6 +1,7 @@
 import { normalizeTone } from "../../../shared/sentiment.ts";
 import type { JarvisTone, SentimentAnalysis } from "../../../shared/sentiment.ts";
 import type {
+  ChatAttachment,
   IntelligenceProfile,
   MemoryItem,
   TranscriptMessage,
@@ -26,6 +27,7 @@ export interface GeminiStreamOptions {
     blockers?: string[];
   }>;
   userTimeZone?: string;
+  attachments?: ChatAttachment[];
   signal?: AbortSignal;
   onMeta?: (model: string, sentiment?: SentimentAnalysis) => void;
   onTone?: (tone: JarvisTone) => void;
@@ -99,11 +101,22 @@ export async function streamGeminiResponse({
   intelligenceProfile,
   projects,
   userTimeZone,
+  attachments,
   signal,
   onMeta,
   onTone,
   onDelta,
 }: GeminiStreamOptions): Promise<GeminiStreamResult> {
+  const normalizedAttachments = (attachments || []).slice(0, 8).map((a) => ({
+    name: a.name,
+    mimeType: a.mimeType,
+    dataUrl: a.dataUrl,
+    dataBase64: a.dataUrl ? a.dataUrl.replace(/^data:[^;]+;base64,/, "") : undefined,
+    textContent: a.textContent,
+    kind: a.kind,
+    size: a.size,
+  }));
+
   const response = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -140,6 +153,7 @@ export async function streamGeminiResponse({
         (typeof Intl !== "undefined"
           ? Intl.DateTimeFormat().resolvedOptions().timeZone
           : undefined),
+      attachments: normalizedAttachments.length ? normalizedAttachments : undefined,
     }),
     signal,
   });
