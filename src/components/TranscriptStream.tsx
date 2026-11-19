@@ -16,7 +16,7 @@ interface TranscriptStreamProps {
 }
 
 const QUICK_PROMPTS = [
-  "Bonjour JARVIS, fais-moi un point rapide sur l'état du système.",
+  "Salut JARVIS, fais-moi un point rapide sur l'état du système.",
   "Explique-moi la physique quantique en trois phrases simples.",
   "Retiens que je préfère des réponses brèves et précises.",
 ];
@@ -61,7 +61,7 @@ export function TranscriptStream({
                 extremeDark ? "text-slate-300" : "text-slate-100"
               }`}
             >
-              À votre écoute, Monsieur.
+              Salut, moi c&apos;est JARVIS. Comment je pourrais vous aider ?
             </h2>
             <p
               className={`text-sm leading-relaxed ${

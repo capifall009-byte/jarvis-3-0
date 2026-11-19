@@ -47,18 +47,14 @@ const QUICK_ACCESS: Array<{ id: AppView; label: string; desc: string; icon: type
 ];
 
 const SUGGESTIONS = [
-  "Bonjour JARVIS, fais-moi un point rapide sur l'état du système.",
+  "Salut JARVIS, fais-moi un point rapide sur l'état du système.",
   "Explique-moi la physique quantique en trois phrases simples.",
   "Recherche et compare plusieurs sources sur un sujet précis.",
   "Retiens que je préfère des réponses brèves et précises.",
 ];
 
 function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 6) return "Bonne nuit";
-  if (h < 12) return "Bonjour";
-  if (h < 18) return "Bon après-midi";
-  return "Bonsoir";
+  return "Salut, moi c'est JARVIS. Comment je pourrais vous aider ?";
 }
 
 export function HomeView({
@@ -129,7 +125,7 @@ export function HomeView({
           )}
           <p className={`text-xs uppercase tracking-[0.2em] ${accent}`}>JARVIS 3.0</p>
           <h1 className={`jarvis-stark-title font-display text-2xl sm:text-4xl font-medium ${extremeDark ? "text-slate-100" : "text-cyan-50"}`}>
-            {greeting()}, Monsieur.
+            {greeting()}
           </h1>
           <p className={`text-sm capitalize ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>{dateLabel}</p>
           <p className={`max-w-2xl text-sm leading-relaxed ${extremeDark ? "text-slate-400" : "text-slate-300"}`}>
@@ -153,7 +149,7 @@ export function HomeView({
             </button>
             <button
               type="button"
-              onClick={() => onSpeakText("Bonjour Monsieur. JARVIS est à votre disposition.")}
+              onClick={() => onSpeakText("Salut, moi c'est JARVIS. Comment je pourrais vous aider ?")}
               className={`inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl border text-sm font-medium cursor-pointer ${extremeDark ? "border-white/[0.08] text-slate-300" : "border-cyan-400/20 text-slate-200"}`}
               aria-label="Écouter le message d'accueil"
             >
