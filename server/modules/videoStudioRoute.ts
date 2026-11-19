@@ -256,13 +256,20 @@ function renderFormat(
         compositionId,
         outputPath,
         `--props=${propsPath}`,
-        // Render free tier : 1 CPU / 512 Mo. Un seul onglet Chrome et une
-        // échelle réduite évitent l'OOM ; le rendu reste valide en 540×960 / 960×540.
+        // Render free tier : 1 CPU / 512 Mo. Un seul onglet Chrome, échelle
+        // réduite et tas Node étendu pour éviter l'OOM (540×960 → 270×480).
         "--concurrency=1",
-        "--scale=0.5",
+        "--scale=0.25",
         "--crf=20",
       ],
-      { cwd: process.cwd(), env: process.env, windowsHide: true }
+      {
+        cwd: process.cwd(),
+        windowsHide: true,
+        env: {
+          ...process.env,
+          NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --max-old-space-size=384`.trim(),
+        },
+      }
     );
 
     context.child = child;
