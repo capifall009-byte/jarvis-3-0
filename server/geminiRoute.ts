@@ -13,6 +13,7 @@ import { buildJarvisSystemInstruction } from "./jarvisPrompt.ts";
 import type { MemoryContextItem } from "./jarvisPrompt.ts";
 import { analyzeUserSentiment, normalizeTone } from "../shared/sentiment.ts";
 import type { JarvisTone } from "../shared/sentiment.ts";
+import { buildTimeContextForMessage } from "./services/time/worldTime.ts";
 
 interface GeminiRequestBody {
   message?: string;
@@ -45,6 +46,7 @@ interface GeminiRequestBody {
     nextActions?: string[];
     blockers?: string[];
   }>;
+  userTimeZone?: string;
 }
 
 /** Retire les balises de mémorisation du texte visible (le client les extrait déjà,
@@ -140,13 +142,19 @@ export function createGeminiRouter(): Router {
       ];
 
       const ai = getGeminiClient();
+      const userTimeZone =
+        typeof body.userTimeZone === "string" && body.userTimeZone.trim().length <= 120
+          ? body.userTimeZone.trim()
+          : undefined;
+      const timeContext = buildTimeContextForMessage(message, userTimeZone);
       const systemInstruction = buildJarvisSystemInstruction(
         memories,
         sentiment,
         body.mode,
         body.vocalStyle,
         body.intelligenceProfile,
-        Array.isArray(body.projects) ? body.projects : []
+        Array.isArray(body.projects) ? body.projects : [],
+        timeContext
       );
 
       if (!shouldStream) {
@@ -306,13 +314,21 @@ export function createGeminiRouter(): Router {
 
       const ai = getGeminiClient();
       const sentiment = analyzeUserSentiment(prompt);
+      const siriTimeZone =
+        typeof (req.body as { userTimeZone?: string })?.userTimeZone === "string"
+          ? String((req.body as { userTimeZone?: string }).userTimeZone).trim()
+          : typeof req.query.tz === "string"
+          ? req.query.tz.trim()
+          : undefined;
+      const timeContext = buildTimeContextForMessage(prompt, siriTimeZone);
       const systemInstruction = buildJarvisSystemInstruction(
         [],
         sentiment,
         undefined,
         undefined,
         undefined,
-        []
+        [],
+        timeContext
       );
 
       let activeModel = JARVIS_GEMINI_MODEL;

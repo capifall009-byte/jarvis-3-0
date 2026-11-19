@@ -24,6 +24,7 @@ const EXPENSIVE_PATHS = [
   "/api/web/compare",
   "/api/files/analyze",
   "/api/video/ai/generate",
+  "/api/reels/render",
 ];
 const EXEMPT_PATHS = ["/api/gemini/health", "/api/news"];
 

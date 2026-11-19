@@ -10,7 +10,11 @@ import { createFilesRouter } from "./server/modules/filesRoute.ts";
 import { createNewsRouter } from "./server/modules/newsRoute.ts";
 import { createVideoRouter } from "./server/modules/videoRoute.ts";
 import { createAiVideoRouter } from "./server/modules/aiVideoRoute.ts";
+import { createReelRouter } from "./server/modules/reelRoute.ts";
+import { createVideoStudioRouter } from "./server/modules/videoStudioRoute.ts";
 import { createSocialRouter } from "./server/modules/socialRoute.ts";
+import { createAiProvidersRouter } from "./server/modules/aiProvidersRoute.ts";
+import { createOllamaRouter } from "./server/modules/ollamaRoute.ts";
 import { createApiSecurityMiddleware, createBasicAuthMiddleware } from "./server/modules/apiSecurity.ts";
 import { migratePlaintextTokens } from "./server/modules/social/tokenStore.ts";
 
@@ -33,6 +37,16 @@ async function bootstrap() {
   if (basicAuth) app.use(basicAuth);
   app.use(express.json({ limit: "25mb" }));
 
+  // Reels rendus (Remotion) : servis dans les deux modes, même si public/ n'est pas
+  // recopié après le build de production.
+  app.use("/reels", express.static(path.resolve(process.cwd(), "public", "reels")));
+
+  // Vidéos générées par le Studio vidéo (script + voix off + Remotion).
+  app.use(
+    "/generated",
+    express.static(path.resolve(process.cwd(), "public", "generated"))
+  );
+
   // Sécurisation API (désactivée en local par défaut, prête pour un déploiement distant).
   app.use("/api", createApiSecurityMiddleware());
 
@@ -44,11 +58,24 @@ async function bootstrap() {
   app.use("/api", createNewsRouter());
   app.use("/api", createVideoRouter());
   app.use("/api", createAiVideoRouter());
+  app.use("/api", createReelRouter());
+  app.use("/api", createVideoStudioRouter());
   app.use("/api", createSocialRouter());
+  app.use("/api", createAiProvidersRouter());
+  app.use("/api", createOllamaRouter());
 
   const httpServer = http.createServer(app);
 
   if (!isProduction) {
+    // En développement, éviter qu'un ancien Service Worker (PWA/prod) ne serve une UI obsolète.
+    // Ce SW de dev se remplace lui-même et se désinscrit côté client, sans affecter la production.
+    app.get("/sw.js", (_req, res) => {
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.send(
+        `self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',(e)=>{e.waitUntil((async()=>{try{const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)));}catch{} try{await self.registration.unregister();}catch{} try{const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});clients.forEach(c=>c.navigate(c.url));}catch{}})());});self.addEventListener('fetch',()=>{});`
+      );
+    });
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: {

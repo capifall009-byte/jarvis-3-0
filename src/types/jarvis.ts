@@ -5,13 +5,21 @@ export type AppView =
   | "conversations"
   | "memory"
   | "search"
+  | "research"
   | "files"
   | "video"
   | "aiVideo"
+  | "reels"
   | "settings"
   | "news"
   | "social"
-  | "intelligence";
+  | "intelligence"
+  | "projects"
+  | "modes"
+  | "controlCenter"
+  | "aiHub"
+  | "imageStudio"
+  | "mobileAccess";
 
 export type VoiceState =
   | "idle"

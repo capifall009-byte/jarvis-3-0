@@ -25,6 +25,7 @@ export interface GeminiStreamOptions {
     nextActions?: string[];
     blockers?: string[];
   }>;
+  userTimeZone?: string;
   signal?: AbortSignal;
   onMeta?: (model: string, sentiment?: SentimentAnalysis) => void;
   onTone?: (tone: JarvisTone) => void;
@@ -97,6 +98,7 @@ export async function streamGeminiResponse({
   vocalStyle,
   intelligenceProfile,
   projects,
+  userTimeZone,
   signal,
   onMeta,
   onTone,
@@ -133,6 +135,11 @@ export async function streamGeminiResponse({
         nextActions: p.nextActions || [],
         blockers: (p.blockers || []).map((b: any) => (typeof b === "string" ? b : b?.description)).filter(Boolean),
       })),
+      userTimeZone:
+        userTimeZone ||
+        (typeof Intl !== "undefined"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : undefined),
     }),
     signal,
   });

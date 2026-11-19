@@ -11,14 +11,13 @@ interface TranscriptStreamProps {
   isThinking: boolean;
   extremeDark?: boolean;
   onQuickPrompt: (prompt: string) => void;
-  /** Régénère une réponse JARVIS (additif ; le flux existant reste inchangé). */
   onRegenerate?: (assistantMessageId: string) => void;
 }
 
 const QUICK_PROMPTS = [
-  "Salut JARVIS, fais-moi un point rapide sur l'état du système.",
-  "Explique-moi la physique quantique en trois phrases simples.",
-  "Retiens que je préfère des réponses brèves et précises.",
+  "Fais-moi un point rapide sur l'état du système.",
+  "Explique-moi un sujet complexe simplement.",
+  "Aide-moi à organiser mes priorités du jour.",
 ];
 
 function formatTime(ts: number): string {
@@ -53,54 +52,31 @@ export function TranscriptStream({
 
   if (messages.length === 0 && !interimTranscript && !isThinking) {
     return (
-      <div className="flex flex-col justify-center h-full px-4 py-6 sm:px-6">
-        <div className="max-w-md mx-auto w-full space-y-5">
-          <div className="space-y-1.5 text-center lg:text-left">
-            <h2
-              className={`font-display text-lg font-medium ${
-                extremeDark ? "text-slate-300" : "text-slate-100"
-              }`}
-            >
-              Salut, moi c&apos;est JARVIS. Comment je pourrais vous aider ?
+      <div className="flex flex-col justify-center h-full px-4 py-8 sm:px-6">
+        <div className="max-w-2xl mx-auto w-full space-y-5">
+          <div className="space-y-2 text-center">
+            <h2 className={`font-display text-xl sm:text-2xl font-medium ${extremeDark ? "text-slate-200" : "text-cyan-50"}`}>
+              Comment puis-je vous aider ?
             </h2>
-            <p
-              className={`text-sm leading-relaxed ${
-                extremeDark ? "text-slate-500" : "text-slate-400"
-              }`}
-            >
-              Touchez « Parler » pour dicter votre demande en français, ou
-              saisissez votre message ci-dessous.
+            <p className={`text-sm ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
+              Écrivez un message ou utilisez le micro. JARVIS vous répond dans une conversation claire et continue.
             </p>
           </div>
-
-          <div
-            className={`space-y-2 pt-2 border-t ${
-              extremeDark ? "border-white/[0.03]" : "border-white/[0.07]"
-            }`}
-          >
-            <p
-              className={`text-xs ${
-                extremeDark ? "text-slate-600" : "text-slate-500"
-              }`}
-            >
-              Suggestions
-            </p>
-            <div className="flex flex-col gap-2">
-              {QUICK_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => onQuickPrompt(prompt)}
-                  className={`text-left text-sm px-3.5 py-2.5 min-h-[44px] rounded-xl border transition-colors cursor-pointer ${
-                    extremeDark
-                      ? "text-slate-400 hover:text-cyan-200/80 bg-black hover:bg-white/[0.02] border-white/[0.05] hover:border-cyan-500/20"
-                      : "text-slate-300 hover:text-cyan-200 bg-white/[0.025] hover:bg-cyan-500/[0.07] border-white/[0.06] hover:border-cyan-400/25"
-                  }`}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+            {QUICK_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => onQuickPrompt(prompt)}
+                className={`text-left text-sm px-3.5 py-3 min-h-[52px] rounded-xl border transition-colors cursor-pointer ${
+                  extremeDark
+                    ? "text-slate-300 hover:text-cyan-100 bg-white/[0.02] hover:bg-white/[0.04] border-white/[0.06] hover:border-cyan-500/20"
+                    : "text-slate-200 hover:text-cyan-50 bg-white/[0.02] hover:bg-cyan-500/[0.06] border-cyan-400/15 hover:border-cyan-400/30"
+                }`}
+              >
+                {prompt}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -108,236 +84,122 @@ export function TranscriptStream({
   }
 
   return (
-    <div className="jarvis-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
-      {messages.map((msg) => {
-        const isUser = msg.role === "user";
-        const showUserSentiment =
-          isUser && msg.sentiment && msg.sentiment.category !== "neutral";
-        const showAssistantTone =
-          !isUser && msg.tone && msg.tone !== "neutral";
+    <div className="jarvis-scroll flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto w-full px-4 py-5 sm:px-6 space-y-6">
+        {messages.map((msg) => {
+          const isUser = msg.role === "user";
+          const showUserSentiment = isUser && msg.sentiment && msg.sentiment.category !== "neutral";
+          const showAssistantTone = !isUser && msg.tone && msg.tone !== "neutral";
 
-        return (
-          <article
-            key={msg.id}
-            className={`flex flex-col gap-1.5 ${
-              isUser ? "items-end" : "items-start"
-            }`}
-          >
-            <div
-              className={`flex items-center flex-wrap gap-2 text-xs ${
-                extremeDark ? "text-slate-600" : "text-slate-500"
-              }`}
-            >
-              <span
-                className={
-                  extremeDark
-                    ? isUser
-                      ? "font-medium text-slate-400"
-                      : "font-medium text-cyan-500/75"
-                    : isUser
-                    ? "font-medium text-slate-300"
-                    : "font-medium text-cyan-400"
-                }
-              >
-                {isUser ? "Vous" : "JARVIS"}
-              </span>
-              <span aria-hidden="true">·</span>
-              <time className="font-mono-tabular">{formatTime(msg.timestamp)}</time>
-              <span aria-hidden="true">·</span>
-              <span>{msg.source === "voice" ? "Vocal" : "Texte"}</span>
-              {showUserSentiment && msg.sentiment && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span
-                    className={
-                      extremeDark ? "text-slate-500" : "text-slate-400"
-                    }
-                  >
-                    {msg.sentiment.label}
-                  </span>
-                </>
-              )}
-              {showAssistantTone && msg.tone && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span
-                    className={
-                      extremeDark ? "text-cyan-500/70" : "text-cyan-300/85"
-                    }
-                  >
-                    Ton{" "}
-                    {TONE_PROSODY_PROFILES[msg.tone].label.toLowerCase()}
-                  </span>
-                </>
-              )}
-              {!isUser && !msg.isPartial && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => copyMessage(msg.id, msg.text)}
-                    className="inline-flex items-center gap-1 min-h-[28px] px-1.5 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer"
-                    title="Copier la réponse"
-                    aria-label="Copier la réponse"
-                  >
-                    {copiedId === msg.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </button>
-                  {onRegenerate && (
+          return (
+            <article key={msg.id} className={`flex flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
+              <div className={`flex items-center flex-wrap gap-2 text-[11px] ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
+                <span className={isUser ? (extremeDark ? "font-medium text-slate-300" : "font-medium text-slate-200") : (extremeDark ? "font-medium text-cyan-300/80" : "font-medium text-cyan-300")}>
+                  {isUser ? "Vous" : "JARVIS"}
+                </span>
+                <span aria-hidden="true">·</span>
+                <time className="font-mono-tabular">{formatTime(msg.timestamp)}</time>
+                <span aria-hidden="true">·</span>
+                <span>{msg.source === "voice" ? "Vocal" : "Texte"}</span>
+                {showUserSentiment && msg.sentiment && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{msg.sentiment.label}</span>
+                  </>
+                )}
+                {showAssistantTone && msg.tone && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className={extremeDark ? "text-cyan-400/70" : "text-cyan-300/85"}>
+                      Ton {TONE_PROSODY_PROFILES[msg.tone].label.toLowerCase()}
+                    </span>
+                  </>
+                )}
+                {!isUser && !msg.isPartial && (
+                  <span className="inline-flex items-center gap-0.5 ml-1">
                     <button
                       type="button"
-                      onClick={() => onRegenerate(msg.id)}
-                      className="inline-flex items-center gap-1 min-h-[28px] px-1.5 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer"
-                      title="Régénérer la réponse"
-                      aria-label="Régénérer la réponse"
+                      onClick={() => copyMessage(msg.id, msg.text)}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer"
+                      title="Copier la réponse"
+                      aria-label="Copier la réponse"
                     >
-                      <RotateCcw className="w-3 h-3" />
+                      {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div
-              className={`max-w-[92%] sm:max-w-[84%] rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 text-[15px] leading-relaxed border ${
-                isUser ? "jarvis-stark-bubble-user" : "jarvis-stark-bubble-ai"
-              } ${
-                extremeDark
-                  ? isUser
-                    ? "bg-white/[0.025] text-slate-300 border-white/[0.05]"
-                    : "bg-cyan-950/[0.12] text-slate-300 border-cyan-500/[0.12]"
-                  : isUser
-                  ? "bg-slate-800/65 backdrop-blur-md text-slate-100 border-white/[0.08]"
-                  : "jarvis-glass text-slate-100 border-cyan-400/20"
-              } ${msg.isPartial ? "opacity-90" : ""}`}
-            >
-              <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-
-              {!isUser && msg.sources && msg.sources.length > 0 && (
-                <div
-                  className={`mt-2.5 pt-2 border-t flex flex-col gap-1.5 ${
-                    extremeDark ? "border-white/[0.05]" : "border-cyan-400/15"
-                  }`}
-                >
-                  <p
-                    className={`text-[11px] font-medium ${
-                      extremeDark ? "text-slate-500" : "text-cyan-300/80"
-                    }`}
-                  >
-                    Sources citées
-                  </p>
-                  <div className="flex flex-col gap-1">
-                    {msg.sources.map((src, idx) => (
-                      <a
-                        key={`${msg.id}-src-${idx}`}
-                        href={src.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`text-xs underline-offset-2 hover:underline truncate ${
-                          extremeDark
-                            ? "text-cyan-400/75 hover:text-cyan-300"
-                            : "text-cyan-300 hover:text-cyan-200"
-                        }`}
+                    {onRegenerate && (
+                      <button
+                        type="button"
+                        onClick={() => onRegenerate(msg.id)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer"
+                        title="Régénérer la réponse"
+                        aria-label="Régénérer la réponse"
                       >
-                        [{idx + 1}] {src.title || src.domain}
-                      </a>
-                    ))}
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              <div
+                className={`w-full sm:w-auto max-w-full sm:max-w-[88%] rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 text-[15px] leading-relaxed border ${
+                  isUser
+                    ? extremeDark
+                      ? "bg-cyan-950/20 text-slate-100 border-cyan-500/20"
+                      : "bg-cyan-500/10 text-slate-100 border-cyan-400/25"
+                    : extremeDark
+                    ? "bg-[#060b14] text-slate-200 border-white/[0.06]"
+                    : "bg-[#07101d]/80 text-slate-100 border-cyan-400/15"
+                } ${msg.isPartial ? "opacity-90" : ""}`}
+              >
+                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+
+                {!isUser && msg.sources && msg.sources.length > 0 && (
+                  <div className={`mt-3 pt-2.5 border-t flex flex-col gap-1.5 ${extremeDark ? "border-white/[0.06]" : "border-cyan-400/15"}`}>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Sources</p>
+                    <ul className="space-y-1">
+                      {msg.sources.map((s, i) => (
+                        <li key={`${msg.id}-src-${i}`} className="text-xs">
+                          <a href={s.url} target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 underline underline-offset-2 break-all">
+                            {s.title || s.url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+
+        {interimTranscript && (
+          <article className="flex flex-col gap-1.5 items-end opacity-80">
+            <div className={`text-[11px] ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>Vous · en cours…</div>
+            <div className={`max-w-full sm:max-w-[88%] rounded-2xl px-4 py-3 border text-[15px] italic ${extremeDark ? "bg-white/[0.02] border-white/[0.06] text-slate-300" : "bg-white/[0.03] border-cyan-400/15 text-slate-200"}`}>
+              <p className="whitespace-pre-wrap break-words">{interimTranscript}</p>
+              {interimSentiment && interimSentiment.category !== "neutral" && (
+                <p className="mt-1 text-[11px] not-italic text-slate-400">{interimSentiment.label}</p>
               )}
             </div>
           </article>
-        );
-      })}
+        )}
 
-      {interimTranscript && (
-        <article className="flex flex-col items-end gap-1.5">
-          <div
-            className={`flex items-center gap-2 text-xs ${
-              extremeDark ? "text-slate-600" : "text-slate-500"
-            }`}
-          >
-            <span
-              className={`font-medium ${
-                extremeDark ? "text-cyan-400/75" : "text-cyan-300"
-              }`}
-            >
-              Vous
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>Dictée en cours</span>
-            {interimSentiment && interimSentiment.category !== "neutral" && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span
-                  className={
-                    extremeDark ? "text-cyan-400/65" : "text-cyan-300/80"
-                  }
-                >
-                  {interimSentiment.label}
-                </span>
-              </>
-            )}
-          </div>
-          <div
-            className={`max-w-[90%] sm:max-w-[82%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed border ${
-              extremeDark
-                ? "bg-white/[0.02] text-slate-300 border-cyan-500/20"
-                : "bg-slate-800/50 text-slate-200 border-cyan-400/25"
-            }`}
-          >
-            <p className="whitespace-pre-wrap break-words">{interimTranscript}</p>
-          </div>
-        </article>
-      )}
-
-      {isThinking && (
-        <div className="flex flex-col items-start gap-1.5">
-          <div
-            className={`flex items-center gap-2 text-xs ${
-              extremeDark ? "text-slate-600" : "text-slate-500"
-            }`}
-          >
-            <span
-              className={`font-medium ${
-                extremeDark ? "text-cyan-500/75" : "text-cyan-400"
-              }`}
-            >
-              JARVIS
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>Analyse en cours</span>
-          </div>
-          <div
-            className={`rounded-2xl px-4 py-3 border ${
-              extremeDark
-                ? "bg-cyan-950/[0.1] border-cyan-500/[0.1]"
-                : "bg-cyan-950/20 border-cyan-500/15"
-            }`}
-          >
-            <div
-              className="flex items-center gap-1.5"
-              aria-label="JARVIS analyse votre demande"
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.2s] ${
-                  extremeDark ? "bg-cyan-500/65" : "bg-cyan-400"
-                }`}
-              />
-              <span
-                className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.1s] ${
-                  extremeDark ? "bg-cyan-500/65" : "bg-cyan-400"
-                }`}
-              />
-              <span
-                className={`w-1.5 h-1.5 rounded-full animate-bounce ${
-                  extremeDark ? "bg-cyan-500/65" : "bg-cyan-400"
-                }`}
-              />
+        {isThinking && (
+          <article className="flex flex-col gap-1.5 items-start">
+            <div className={`text-[11px] ${extremeDark ? "text-cyan-300/70" : "text-cyan-300/85"}`}>JARVIS · réflexion…</div>
+            <div className={`rounded-2xl px-4 py-3 border ${extremeDark ? "bg-[#060b14] border-white/[0.06]" : "bg-[#07101d]/80 border-cyan-400/15"}`}>
+              <div className="flex items-center gap-1.5" aria-label="JARVIS réfléchit">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 animate-pulse [animation-delay:120ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 animate-pulse [animation-delay:240ms]" />
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </article>
+        )}
 
-      <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-2" />
+      </div>
     </div>
   );
 }

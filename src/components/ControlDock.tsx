@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Mic,
   MicOff,
+  Paperclip,
   SendHorizontal,
   Square,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import type { VoiceState } from "../types/jarvis";
 
@@ -21,7 +23,6 @@ interface ControlDockProps {
   onToggleMute: () => void;
   onSendText: (text: string) => void;
   onDraftChange?: (text: string) => void;
-  /** Pré-remplissage optionnel (suggestions de l'accueil). */
   initialDraft?: string;
 }
 
@@ -39,12 +40,14 @@ export function ControlDock({
   initialDraft,
 }: ControlDockProps) {
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!initialDraft) return;
     setDraft(initialDraft);
     onDraftChange?.(initialDraft);
-  }, [initialDraft]);
+  }, [initialDraft, onDraftChange]);
 
   const isListening = voiceState === "listening";
   const isBusy =
@@ -56,138 +59,164 @@ export function ControlDock({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = draft.trim();
-    if (!trimmed) return;
-    onSendText(trimmed);
+    if (!trimmed && attachments.length === 0) return;
+
+    let message = trimmed;
+    if (attachments.length > 0) {
+      const note = `[Pièces jointes sélectionnées : ${attachments.join(", ")}. Pour une analyse détaillée du contenu, utilisez l'espace « Analyse de fichiers ».]`;
+      message = message ? `${message}\n\n${note}` : note;
+    }
+
+    onSendText(message);
     setDraft("");
+    setAttachments([]);
     onDraftChange?.("");
   };
 
+  const onFilesPicked = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const names = Array.from(files).map((f) => f.name).filter(Boolean);
+    setAttachments((prev) => [...prev, ...names].slice(0, 8));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachment = (name: string) => {
+    setAttachments((prev) => prev.filter((n) => n !== name));
+  };
+
+  const shell = extremeDark
+    ? "border-white/[0.08] bg-[#05080f]/95"
+    : "jarvis-glass border-cyan-400/20 bg-[#050A14]/80";
+  const iconBtn = `inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl border transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none`;
+
   return (
-    <div className="w-full px-3 pb-2.5 sm:px-6 shrink-0">
-      <div
-        className={`jarvis-stark-composer max-w-3xl mx-auto rounded-2xl border px-3.5 py-2.5 sm:px-4 transition-colors flex flex-col gap-2.5 ${
-          extremeDark
-            ? "border-white/[0.06] bg-black"
-            : "jarvis-glass border-cyan-400/20"
-        }`}
-      >
-        {/* Voice & Playback Control Row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+    <div className="w-full px-3 pb-3 sm:px-6 shrink-0">
+      <div className={`max-w-3xl mx-auto rounded-2xl border ${shell} backdrop-blur-md px-2.5 py-2 sm:px-3 sm:py-2.5`}>
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1 pb-2">
+            {attachments.map((name) => (
+              <span key={name} className={`inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-lg border text-xs ${extremeDark ? "border-cyan-500/25 bg-cyan-950/20 text-cyan-100" : "border-cyan-400/25 bg-cyan-500/10 text-cyan-50"}`}>
+                <span className="truncate max-w-[180px] sm:max-w-[240px]">{name}</span>
+                <button type="button" onClick={() => removeAttachment(name)} className="text-slate-400 hover:text-slate-100 cursor-pointer" aria-label={`Retirer ${name}`}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => onFilesPicked(e.target.files)}
+            aria-label="Joindre des fichiers"
+          />
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Joindre des pièces"
+              title="Pièces jointes"
+              className={`${iconBtn} ${extremeDark ? "border-white/[0.06] text-slate-300 hover:text-cyan-300 hover:bg-white/[0.03]" : "border-cyan-400/20 text-slate-300 hover:text-cyan-200 hover:bg-white/[0.04]"}`}
+            >
+              <Paperclip className="w-4.5 h-4.5" />
+            </button>
+
             <button
               type="button"
               onClick={onToggleMic}
-              aria-label={
+              aria-label={isListening ? "Arrêter l'écoute du microphone" : "Parler à JARVIS"}
+              title={isListening ? "Arrêter l'écoute" : "Micro"}
+              className={`${iconBtn} ${
                 isListening
-                  ? "Arrêter l'écoute du microphone"
-                  : "Parler à JARVIS au microphone"
-              }
-              className={`inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-medium text-sm transition-all duration-150 whitespace-nowrap shrink-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${
-                extremeDark
-                  ? isListening
-                    ? "bg-cyan-950/45 text-cyan-300 border border-cyan-500/40 shadow-none"
-                    : "bg-cyan-950/35 hover:bg-cyan-900/45 text-cyan-200 border border-cyan-500/30 shadow-none"
-                  : isListening
-                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.2)]"
-                  : "bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.28)]"
+                  ? extremeDark
+                    ? "bg-cyan-950/45 text-cyan-300 border-cyan-500/40"
+                    : "bg-cyan-500/20 text-cyan-200 border-cyan-400/50"
+                  : extremeDark
+                  ? "bg-cyan-950/25 hover:bg-cyan-900/35 text-cyan-200 border-cyan-500/25"
+                  : "bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 border-cyan-400/25"
               }`}
             >
-              {isListening ? (
-                <>
-                  <MicOff className="w-4 h-4" />
-                  <span>Écoute…</span>
-                </>
-              ) : (
-                <>
-                  <Mic className="w-4 h-4" />
-                  <span>Parler</span>
-                </>
-              )}
+              {isListening ? <MicOff className="w-4.5 h-4.5" /> : <Mic className="w-4.5 h-4.5" />}
             </button>
+          </div>
 
+          <div className="flex-1 min-w-0">
+            <textarea
+              value={draft}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDraft(val);
+                onDraftChange?.(val);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.currentTarget.form as HTMLFormElement | null)?.requestSubmit();
+                }
+              }}
+              rows={1}
+              placeholder={isOffline ? "Commande hors ligne (souvenirs, fichiers, heure)…" : "Écrire un message à JARVIS…"}
+              aria-label="Message pour JARVIS"
+              className={`w-full min-h-[44px] max-h-36 resize-none px-4 py-2.5 rounded-xl border focus:outline-none text-[15px] leading-relaxed transition-colors ${
+                extremeDark
+                  ? "bg-black/60 border-white/[0.06] focus:border-cyan-500/40 text-slate-100 placeholder:text-slate-600"
+                  : "bg-[#050A14]/70 border-cyan-400/15 focus:border-cyan-400/45 text-slate-100 placeholder:text-slate-500"
+              }`}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={onStopAll}
               disabled={!isBusy}
-              aria-label="Arrêter immédiatement la voix et la génération"
-              className={`inline-flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-xl disabled:opacity-35 disabled:pointer-events-none border text-sm font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              aria-label="Arrêter la voix et la génération"
+              title="Arrêt"
+              className={`${iconBtn} ${
                 extremeDark
-                  ? "bg-red-950/25 hover:bg-red-950/40 border-red-500/20 text-red-300/80"
-                  : "bg-red-500/15 hover:bg-red-500/25 border-red-400/35 text-red-200"
+                  ? "bg-red-950/20 hover:bg-red-950/35 border-red-500/20 text-red-300/85"
+                  : "bg-red-500/10 hover:bg-red-500/20 border-red-400/30 text-red-200"
               }`}
             >
-              <Square className="w-3.5 h-3.5 fill-current" />
-              <span>STOP</span>
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-label={isMuted ? "Réactiver la voix de JARVIS" : "Couper la voix de JARVIS"}
+              aria-pressed={isMuted}
+              title={isMuted ? "Activer le son" : "Couper le son"}
+              className={`${iconBtn} ${
+                isMuted
+                  ? "bg-amber-950/20 border-amber-500/25 text-amber-300/90"
+                  : extremeDark
+                  ? "border-white/[0.06] text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
+                  : "border-cyan-400/15 text-slate-300 hover:text-cyan-100 hover:bg-white/[0.04]"
+              }`}
+            >
+              {isMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
+            </button>
+
+            <button
+              type="submit"
+              disabled={!draft.trim() && attachments.length === 0}
+              aria-label="Envoyer le message"
+              title="Envoyer"
+              className={`${iconBtn} ${
+                extremeDark
+                  ? "bg-cyan-500/15 hover:bg-cyan-500/25 border-cyan-500/30 text-cyan-200"
+                  : "bg-cyan-400/20 hover:bg-cyan-400/30 border-cyan-400/30 text-cyan-100"
+              }`}
+            >
+              <SendHorizontal className="w-4.5 h-4.5" />
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onToggleMute}
-            aria-label={
-              isMuted
-                ? "Réactiver la voix de JARVIS"
-                : "Couper le son de JARVIS (mode muet)"
-            }
-            aria-pressed={isMuted}
-            className={`inline-flex items-center justify-center gap-1.5 h-11 px-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              extremeDark
-                ? isMuted
-                  ? "bg-amber-950/25 border-amber-500/25 text-amber-300/85 hover:bg-amber-950/40"
-                  : "bg-transparent border-white/[0.05] text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
-                : isMuted
-                ? "bg-amber-500/15 border-amber-400/35 text-amber-200 hover:bg-amber-500/25"
-                : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:text-cyan-200 hover:bg-white/[0.07]"
-            }`}
-          >
-            {isMuted ? (
-              <>
-                <VolumeX className="w-4 h-4" />
-                <span>Muet</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-4 h-4" />
-                <span className="hidden xs:inline sm:inline">Voix active</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Text Input Row */}
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => {
-              const val = e.target.value;
-              setDraft(val);
-              onDraftChange?.(val);
-            }}
-            placeholder={
-              isOffline
-                ? "Commande hors ligne (souvenirs, fichiers, heure)…"
-                : "Écrire un message à JARVIS…"
-            }
-            aria-label="Message texte pour JARVIS"
-            className={`w-full h-11 px-4 rounded-xl border focus:outline-none text-[15px] transition-colors ${
-              extremeDark
-                ? "bg-black border-white/[0.06] focus:border-cyan-500/40 text-slate-200 placeholder:text-slate-600"
-                : "bg-[#050A14]/85 border-cyan-400/15 focus:border-cyan-400/50 text-slate-100 placeholder:text-slate-500"
-            }`}
-          />
-          <button
-            type="submit"
-            disabled={!draft.trim()}
-            aria-label="Envoyer le message"
-            className={`inline-flex items-center justify-center w-11 h-11 rounded-xl disabled:opacity-40 disabled:pointer-events-none border transition-colors shrink-0 cursor-pointer ${
-              extremeDark
-                ? "bg-transparent hover:bg-cyan-950/30 border-white/[0.06] text-cyan-400/75"
-                : "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-400/20 text-cyan-300"
-            }`}
-          >
-            <SendHorizontal className="w-5 h-5" />
-          </button>
         </form>
       </div>
     </div>

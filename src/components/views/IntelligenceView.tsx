@@ -47,6 +47,7 @@ import {
 type TabId = "profil" | "memoire" | "projets" | "historique";
 
 interface IntelligenceViewProps {
+  initialTab?: TabId;
   extremeDark: boolean;
   profile: IntelligenceProfile;
   onUpdateProfile: (patch: Partial<IntelligenceProfile>) => void;
@@ -187,6 +188,7 @@ function TaskRow({
 
 export function IntelligenceView(props: IntelligenceViewProps) {
   const {
+    initialTab,
     extremeDark,
     profile,
     onUpdateProfile,
@@ -215,7 +217,7 @@ export function IntelligenceView(props: IntelligenceViewProps) {
     sessions,
   } = props;
 
-  const [tab, setTab] = useState<TabId>("profil");
+  const [tab, setTab] = useState<TabId>(initialTab ?? "profil");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectObjective, setNewProjectObjective] = useState("");

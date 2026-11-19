@@ -44,6 +44,7 @@ interface WebSearchViewProps {
   isOnline: boolean;
   extremeDark: boolean;
   onSpeakText: (text: string) => void;
+  initialMode?: "search" | "url" | "compare" | "research";
 }
 
 type TypeFilter = "all" | WebHistoryOperationType;
@@ -92,8 +93,9 @@ export function WebSearchView({
   isOnline,
   extremeDark,
   onSpeakText,
+  initialMode = "search",
 }: WebSearchViewProps) {
-  const [mode, setMode] = useState<"search" | "url" | "compare" | "research">("search");
+  const [mode, setMode] = useState<"search" | "url" | "compare" | "research">(initialMode);
   const [query, setQuery] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [urlQuestion, setUrlQuestion] = useState("");
@@ -120,6 +122,10 @@ export function WebSearchView({
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false);
   const detailRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   useEffect(() => {
     let mounted = true;

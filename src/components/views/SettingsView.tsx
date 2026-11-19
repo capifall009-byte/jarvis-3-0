@@ -5,7 +5,9 @@ import {
   Copy,
   Download,
   HardDrive,
+  MessageSquareQuote,
   Moon,
+  Quote,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -41,6 +43,10 @@ interface SettingsViewProps {
   onClearAllLocalData: () => Promise<void>;
   vocalStyle: VocalStyle;
   onChangeVocalStyle: (style: VocalStyle) => void;
+  startupGreetingSpokenEnabled: boolean;
+  onChangeStartupGreetingSpokenEnabled: (enabled: boolean) => void;
+  showDailyQuote: boolean;
+  onChangeShowDailyQuote: (enabled: boolean) => void;
 }
 
 export function SettingsView({
@@ -54,6 +60,10 @@ export function SettingsView({
   onClearAllLocalData,
   vocalStyle,
   onChangeVocalStyle,
+  startupGreetingSpokenEnabled,
+  onChangeStartupGreetingSpokenEnabled,
+  showDailyQuote,
+  onChangeShowDailyQuote,
 }: SettingsViewProps) {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -318,6 +328,79 @@ export function SettingsView({
             <div className="flex justify-between text-[10px] text-slate-500">
               <span>Subtil</span>
               <span>Marqué</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Home Experience */}
+        <section
+          className={`rounded-2xl border p-4 space-y-4 ${
+            extremeDark ? "bg-black border-white/[0.06]" : "jarvis-glass"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`p-2 rounded-xl border ${
+                extremeDark ? "bg-cyan-950/30 border-cyan-500/20" : "bg-cyan-500/10 border-cyan-400/20"
+              }`}
+            >
+              <MessageSquareQuote className="w-5 h-5 text-cyan-300" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-sm font-medium text-slate-100">Accueil</h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Personnalisez le message d&apos;accueil et la citation quotidienne affichée sur l&apos;écran d&apos;accueil.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] p-3">
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium text-slate-100 flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-cyan-300" />
+                  Message vocal d&apos;accueil au démarrage
+                </p>
+                <p className="text-xs text-slate-400">
+                  Prononce « Salut, je suis JARVIS. Comment pourrais-je vous aider ? » une seule fois au démarrage (voix fr-FR-HenriNeural, paramètres vocaux actuels). Non répété à la navigation ou à l&apos;actualisation.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onChangeStartupGreetingSpokenEnabled(!startupGreetingSpokenEnabled)}
+                aria-pressed={startupGreetingSpokenEnabled}
+                className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 rounded-xl border text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer ${
+                  startupGreetingSpokenEnabled
+                    ? "bg-cyan-500/20 border-cyan-400/40 text-cyan-100"
+                    : "border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
+                }`}
+              >
+                <span>{startupGreetingSpokenEnabled ? "Activé" : "Désactivé"}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] p-3">
+              <div className="space-y-0.5 min-w-0">
+                <p className="text-sm font-medium text-slate-100 flex items-center gap-2">
+                  <Quote className="w-4 h-4 text-cyan-300" />
+                  Citation du jour
+                </p>
+                <p className="text-xs text-slate-400">
+                  Affiche une citation (auteur indiqué lorsqu&apos;il est connu) renouvelée automatiquement chaque nouveau jour local, sans changer à chaque actualisation.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onChangeShowDailyQuote(!showDailyQuote)}
+                aria-pressed={showDailyQuote}
+                className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 rounded-xl border text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer ${
+                  showDailyQuote
+                    ? "bg-cyan-500/20 border-cyan-400/40 text-cyan-100"
+                    : "border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
+                }`}
+              >
+                <span>{showDailyQuote ? "Affichée" : "Masquée"}</span>
+              </button>
             </div>
           </div>
         </section>

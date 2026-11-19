@@ -45,6 +45,11 @@ export interface ProjectContextItem {
   blockers?: string[];
 }
 
+export interface TimeContextItem {
+  userTimeZone?: string;
+  facts?: string[];
+}
+
 const SENTIMENT_GUIDANCE: Record<SentimentAnalysis["category"], string> = {
   distressed:
     "État émotionnel détecté chez l'utilisateur : fatigue, stress ou tristesse. Abandonne tout sarcasme. Adopte un ton sincèrement empathique, chaleureux, posé et rassurant. Commence impérativement ta réponse par la balise [[TON:empathique]] suivie d'un espace.",
@@ -88,14 +93,21 @@ export function buildJarvisSystemInstruction(
   mode?: ModeContext,
   vocalStyle?: VocalStyleContext,
   intelligenceProfile?: IntelligenceProfileContext,
-  projects?: ProjectContextItem[]
+  projects?: ProjectContextItem[],
+  timeContext?: TimeContextItem
 ): string {
   const now = new Date();
-  const formattedDate = new Intl.DateTimeFormat("fr-FR", {
+  const fallbackDate = new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "full",
-    timeStyle: "short",
-    timeZone: "Europe/Paris",
+    timeStyle: "long",
+    timeZone: "UTC",
   }).format(now);
+  const timeFacts = Array.isArray(timeContext?.facts)
+    ? timeContext!.facts.filter((f): f is string => typeof f === "string" && f.trim().length > 0).slice(0, 30)
+    : [];
+  const timeBlock = timeFacts.length
+    ? `\n\nDONNÉES TEMPORELLES FIABLES (calculées côté serveur via Intl/IANA, à utiliser comme référence ; ne jamais inventer d'heure/date/décalage) :\n${timeFacts.map((f) => `- ${f}`).join("\n")}`
+    : `\n\nRéférence temporelle (UTC, calculée): ${fallbackDate}. Fuseau utilisateur non disponible: ne pas supposer le fuseau local de l'utilisateur ni confondre fuseau serveur et fuseau utilisateur. Si une heure locale précise est demandée, demander la ville ou le fuseau IANA.`;
 
   // Mémoire centrale commune + contexte par mode : inclure les souvenirs centraux
   // (sans modeId) et ceux du mode actif uniquement, sans mélanger les contextes.
@@ -198,7 +210,8 @@ Parle naturellement, avec intelligence et élégance. Comprends l'humour quand i
     `Intonation vocale dynamique : ${activeGuidance} Les seules balises autorisées en tout début de message sont [[TON:empathique]], [[TON:sarcastique]], [[TON:calme]], [[TON:chaleureux]] ou [[TON:neutre]].`,
     "Format adapté à la synthèse vocale : tes réponses seront lues à voix haute. Sois clair et naturel à l'oral. N'utilise aucun formatage markdown (pas d'astérisques, pas de dièses, pas de listes à puces techniques ni d'émojis). Privilégie des phrases bien ponctuées et agréables à entendre.",
     memoryRules,
-    `Date et heure actuelles : ${formattedDate}.`,
+    timeBlock,
+    "Intelligence temporelle : pour toute question d'heure, de date locale, de fuseau horaire (IANA), de changement d'heure été/hiver (DST), de comparaison ou de conversion horaire entre villes/pays, appuie-toi exclusivement sur les données temporelles fiables fournies. Ne confonds jamais le fuseau du serveur avec celui de l'utilisateur. Si un lieu/fuseau est ambigu ou inconnu, demande une précision (ville, région ou fuseau IANA) au lieu d'inventer.",
     personalityBlock,
     intelligenceRules,
     memoryBlock,

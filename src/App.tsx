@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Mic, X } from "lucide-react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ControlDock } from "./components/ControlDock";
@@ -15,8 +15,17 @@ import { SocialHubView } from "./components/views/SocialHubView";
 import { ModeSelector } from "./components/ModeSelector";
 import { VideoView } from "./components/views/VideoView";
 import { AiVideoStudioView } from "./components/views/AiVideoStudioView";
+import { ReelStudioView } from "./components/views/ReelStudioView";
 import { WebSearchView } from "./components/views/WebSearchView";
 import { IntelligenceView } from "./components/views/IntelligenceView";
+import { ProjectsView } from "./components/views/ProjectsView";
+import { ModesView } from "./components/views/ModesView";
+import { ResearchView } from "./components/views/ResearchView";
+import { ControlCenterView } from "./components/views/ControlCenterView";
+import { AiHubView } from "./components/views/AiHubView";
+import { ImageStudioView } from "./components/views/ImageStudioView";
+import { MobileAccessView } from "./components/views/MobileAccessView";
+import { buildBrainUnifiedContext } from "./services/brain/BrainContext";
 import { AudioEngine } from "./services/audio/AudioEngine";
 import {
   getDefaultVocalStyle,
@@ -30,7 +39,16 @@ import {
   clearStoredFiles,
   listStoredFiles,
 } from "./services/files/FileVaultRepository";
-import { streamGeminiResponse } from "./services/gemini/GeminiClient";
+import {
+  hasStartupGreetingBeenSpoken,
+  loadAppPreferences,
+  markStartupGreetingSpoken,
+  saveAppPreferences,
+  type AppPreferences,
+} from "./services/preferences/AppPreferences";
+import { streamGeminiResponse, extractMemoryTags } from "./services/gemini/GeminiClient";
+import { chatWithOllama } from "./services/ai/AiProvidersClient";
+import { getStoredAiSelection, loadAiProviderRegistry, selectAiProvider } from "./services/ai/AiProviderManager";
 import { detectSensitiveMemory, memoryRepository } from "./services/memory/MemoryRepository";
 import {
   getActiveModeId,
@@ -69,6 +87,7 @@ import {
 import {
   TONE_PROSODY_PROFILES,
   analyzeUserSentiment,
+  normalizeTone,
 } from "../shared/sentiment.ts";
 import type { JarvisTone, SentimentAnalysis } from "../shared/sentiment.ts";
 import type {
@@ -109,13 +128,21 @@ const VALID_VIEWS: AppView[] = [
   "conversations",
   "memory",
   "search",
+  "research",
   "files",
   "video",
   "aiVideo",
+  "reels",
   "settings",
   "news",
   "social",
   "intelligence",
+  "projects",
+  "modes",
+  "controlCenter",
+  "aiHub",
+  "imageStudio",
+  "mobileAccess",
 ];
 
 function createMsgId(): string {
@@ -128,9 +155,9 @@ function createMsgId(): string {
 const VOICE_STATUS_TEXT: Record<VoiceState, string> = {
   idle: "EN ATTENTE",
   connecting: "INITIALISATION",
-  listening: "ÉCOUTE",
+  listening: "Ã‰COUTE",
   speaking: "PAROLE",
-  thinking: "RÉFLEXION",
+  thinking: "RÃ‰FLEXION",
   offline: "HORS LIGNE",
   error: "INCIDENT",
 };
@@ -142,7 +169,7 @@ function popReadySentence(buffer: string): {
   sentence: string | null;
   rest: string;
 } {
-  const match = buffer.match(/^([\s\S]{18,}?[.!?…\n]+)(?:\s+|$)([\s\S]*)$/);
+  const match = buffer.match(/^([\s\S]{18,}?[.!?â€¦\n]+)(?:\s+|$)([\s\S]*)$/);
   if (match) {
     return {
       sentence: match[1].trim(),
@@ -218,6 +245,9 @@ export default function App() {
   const [activeMode, setActiveMode] = useState<JarvisMode | null>(null);
 
   const [vocalStyle, setVocalStyle] = useState<VocalStyle>(() => loadVocalStyle());
+  const [appPreferences, setAppPreferences] = useState<AppPreferences>(() => loadAppPreferences());
+  const startupGreetingAttemptedRef = useRef(false);
+  const skipStartupGreetingRef = useRef(false);
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const speechInputRef = useRef<SpeechInput | null>(null);
@@ -259,7 +289,7 @@ export default function App() {
 
   useEffect(() => {
     intelligenceProfileRef.current = intelligenceProfile;
-    // garder la mémoire globale synchronisée
+    // garder la mÃ©moire globale synchronisÃ©e
     memoryRepository.setMemoryEnabled(intelligenceProfile.memoryEnabled);
   }, [intelligenceProfile]);
 
@@ -275,7 +305,7 @@ export default function App() {
     if (isVocalStyleActive(vocalStyle)) {
       engine.setVocalStyle(vocalStyle);
     } else {
-      // Réinitialiser vers le style neutre sans surcharger la prosodie des modes
+      // RÃ©initialiser vers le style neutre sans surcharger la prosodie des modes
       engine.setVocalStyle(getDefaultVocalStyle());
     }
   }, [vocalStyle]);
@@ -287,6 +317,10 @@ export default function App() {
   useEffect(() => {
     isOnlineRef.current = isOnline;
   }, [isOnline]);
+
+  useEffect(() => {
+    saveAppPreferences(appPreferences);
+  }, [appPreferences]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("extreme-dark", isExtremeDark);
@@ -309,7 +343,7 @@ export default function App() {
       setProjects(items);
     } catch (e) {
       setProjectsError(
-        e instanceof Error ? e.message : "Échec du chargement des projets (IndexedDB)."
+        e instanceof Error ? e.message : "Ã‰chec du chargement des projets (IndexedDB)."
       );
     } finally {
       setProjectsLoading(false);
@@ -324,7 +358,7 @@ export default function App() {
       setIntelligenceHistory(items);
     } catch (e) {
       setHistoryError(
-        e instanceof Error ? e.message : "Échec du chargement de l'historique (IndexedDB)."
+        e instanceof Error ? e.message : "Ã‰chec du chargement de l'historique (IndexedDB)."
       );
     } finally {
       setHistoryLoading(false);
@@ -372,7 +406,7 @@ export default function App() {
       },
       onError: (msg) => {
         setErrorInfo({
-          title: "Synthèse vocale",
+          title: "SynthÃ¨se vocale",
           detail: msg,
         });
       },
@@ -413,7 +447,7 @@ export default function App() {
               title: "Configuration Gemini requise",
               detail:
                 data.error ||
-                "La clé API GEMINI_API_KEY n'est pas configurée côté serveur.",
+                "La clÃ© API GEMINI_API_KEY n'est pas configurÃ©e cÃ´tÃ© serveur.",
             });
           }
         }
@@ -464,13 +498,13 @@ export default function App() {
     const trimmed = text.trim();
     const engine = audioEngineRef.current;
     if (!trimmed || !engine) return;
-    // Le mute explicite de l'utilisateur doit rester respecté, y compris depuis News/WebSearch.
+    // Le mute explicite de l'utilisateur doit rester respectÃ©, y compris depuis News/WebSearch.
     if (engine.getMuted()) return;
     engine.prepareOnUserGesture();
     const mode = activeModeRef.current;
     const vs = vocalStyleRef.current;
     const useVocal = isVocalStyleActive(vs);
-    // En mode auto, l'émotion est détectée avant le tour vocal : elle influence donc bien la voix.
+    // En mode auto, l'Ã©motion est dÃ©tectÃ©e avant le tour vocal : elle influence donc bien la voix.
     const speechVs =
       useVocal && vs.auto
         ? { ...vs, emotion: detectAutoEmotion(trimmed, mode?.tone ?? "neutral") }
@@ -594,123 +628,75 @@ export default function App() {
       let ttsSentenceBuffer = "";
       let assistantCreated = false;
 
-      try {
+      const applyExtractedMemories = (extractedMemories: string[]) => {
+        if (!extractedMemories || extractedMemories.length === 0) return;
         const profile = intelligenceProfileRef.current;
-        const contextProjects = projectsRef.current
-          .filter((p) => p.status !== "archived")
-          .slice(0, 8)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            objective: p.objective,
-            status: p.status,
-            progress: p.progress,
-            nextActions: p.nextActions,
-            blockers: p.blockers.filter((b) => !b.resolvedAt).map((b) => b.description),
-          }));
+        if (!profile.memoryEnabled) {
+          setMemoryToast("MǸmoire dǸsactivǸe : rien n'a ǸtǸ enregistrǸ.");
+          setTimeout(() => setMemoryToast(null), 4000);
+          return;
+        }
+        let savedCount = 0;
+        let blockedSensitive = 0;
+        for (const fact of extractedMemories) {
+          const sensitive = detectSensitiveMemory(fact);
+          if (sensitive && !profile.autoSaveSensitive) {
+            blockedSensitive += 1;
+            void addIntelligenceHistory({
+              type: "memory_update",
+              title: "MǸmoire sensible non enregistrǸe automatiquement",
+              detail: "Une information potentiellement sensible a ǸtǸ dǸtectǸe dans une demande de mǸmorisation et n'a pas ǸtǸ enregistrǸe sans autorisation explicite.",
+              level: "warning",
+              relatedConversationId: sessionId,
+            }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("�%vǸnement historique non enregistrǸ:", e));
+            continue;
+          }
+          const added = memoryRepository.addMemory(
+            fact,
+            undefined,
+            activeModeRef.current?.id,
+            { source: "assistant", kind: "fact", sensitive }
+          );
+          if (added) {
+            savedCount += 1;
+            void addIntelligenceHistory({
+              type: "memory_update",
+              title: "Souvenir enregistrǸ",
+              detail: added.fact,
+              level: "info",
+              relatedConversationId: sessionId,
+            }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("�%vǸnement historique non enregistrǸ:", e));
+          }
+        }
+        if (savedCount > 0 || blockedSensitive > 0) {
+          setMemories(memoryRepository.listMemories());
+        }
+        if (blockedSensitive > 0) {
+          setMemoryToast("Information sensible dǸtectǸe : mǸmorisation automatique bloquǸe (autorisation requise).");
+        } else if (savedCount > 0) {
+          setMemoryToast(savedCount === 1 ? "Souvenir enregistrǸ." : `${savedCount} souvenirs enregistrǸs.`);
+        }
+        if (savedCount > 0 || blockedSensitive > 0) {
+          setTimeout(() => setMemoryToast(null), 4500);
+        }
+      };
 
-        const result = await streamGeminiResponse({
-          message: trimmed,
-          history: priorMessages,
-          memories: memoryRepository.getContextMemories(activeModeRef.current?.id),
-          mode: activeModeRef.current
-            ? {
-                id: activeModeRef.current.id,
-                name: activeModeRef.current.name,
-                instructions: composeModeInstructions(activeModeRef.current),
-              }
-            : undefined,
-          vocalStyle: useVocal
-            ? {
-                emotion: vs.emotion,
-                personality: vs.personality,
-                intensity: vs.intensity,
-                auto: vs.auto,
-                geminiInstruction: vocalPreset?.geminiInstruction,
-              }
-            : undefined,
-          intelligenceProfile: {
-            baseTone: profile.baseTone,
-            humorLevel: profile.humorLevel,
-            sarcasmLevel: profile.sarcasmLevel,
-            proactivityLevel: profile.proactivityLevel,
-            detailPreference: profile.detailPreference,
-            askWhenMissingInfo: profile.askWhenMissingInfo,
-            memoryEnabled: profile.memoryEnabled,
-          },
-          projects: contextProjects,
-          signal: controller.signal,
-          onMeta: (model, serverSentiment) => {
-            if (model) setGeminiModel(model);
-            if (serverSentiment) {
-              resolvedTurnTone = serverSentiment.tone;
-              setActiveTone(serverSentiment.tone);
-              engine?.setTurnTone(serverSentiment.tone, speechGenId);
-            }
-          },
-          onTone: (tone) => {
-            resolvedTurnTone = tone;
-            setActiveTone(tone);
-            engine?.setTurnTone(tone, speechGenId);
-            if (assistantCreated) {
-              updateSessionMessages(sessionId, (msgs) =>
-                msgs.map((m) =>
-                  m.id === assistantMsgId ? { ...m, tone } : m
-                )
-              );
-            }
-          },
-          onDelta: (cleanAccumulated, newChunk) => {
-            if (!assistantCreated) {
-              assistantCreated = true;
-              setIsSending(false);
-              updateSessionMessages(sessionId, (msgs) => [
-                ...msgs,
-                {
-                  id: assistantMsgId,
-                  role: "assistant",
-                  text: cleanAccumulated,
-                  timestamp: Date.now(),
-                  source: engine && !engine.getMuted() ? "voice" : "text",
-                  isPartial: true,
-                  tone: resolvedTurnTone,
-                },
-              ]);
-            } else {
-              updateSessionMessages(sessionId, (msgs) =>
-                msgs.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, text: cleanAccumulated, tone: resolvedTurnTone }
-                    : m
-                )
-              );
-            }
-
-            if (engine && !engine.getMuted()) {
-              ttsSentenceBuffer += newChunk;
-              let extracted = popReadySentence(ttsSentenceBuffer);
-              while (extracted.sentence) {
-                engine.enqueueSentence(extracted.sentence, speechGenId);
-                ttsSentenceBuffer = extracted.rest;
-                extracted = popReadySentence(ttsSentenceBuffer);
-              }
-            }
-          },
-        });
-
-        if (controller.signal.aborted) return;
-
-        const finalTone = result.tone || resolvedTurnTone;
+      const finalizeAssistantReply = (reply: string, tone: JarvisTone, modelName: string | null, extractedMemories: string[]) => {
+        const finalTone = tone || resolvedTurnTone;
+        resolvedTurnTone = finalTone;
         setActiveTone(finalTone);
+        if (modelName) setGeminiModel(modelName);
         engine?.setTurnTone(finalTone, speechGenId);
 
         if (!assistantCreated) {
+          assistantCreated = true;
+          setIsSending(false);
           updateSessionMessages(sessionId, (msgs) => [
             ...msgs,
             {
               id: assistantMsgId,
               role: "assistant",
-              text: result.reply,
+              text: reply,
               timestamp: Date.now(),
               source: engine && !engine.getMuted() ? "voice" : "text",
               isPartial: false,
@@ -718,12 +704,13 @@ export default function App() {
             },
           ]);
         } else {
+          setIsSending(false);
           updateSessionMessages(sessionId, (msgs) =>
             msgs.map((m) =>
               m.id === assistantMsgId
                 ? {
                     ...m,
-                    text: result.reply,
+                    text: reply,
                     isPartial: false,
                     tone: finalTone,
                   }
@@ -736,66 +723,238 @@ export default function App() {
           const remainder = ttsSentenceBuffer.trim();
           if (remainder.length > 0) {
             engine.enqueueSentence(remainder, speechGenId);
-          } else if (!assistantCreated && result.reply) {
-            engine.enqueueSentence(result.reply, speechGenId);
+          } else if (reply) {
+            let buf = reply;
+            let extracted = popReadySentence(buf);
+            let sentAny = false;
+            while (extracted.sentence) {
+              engine.enqueueSentence(extracted.sentence, speechGenId);
+              buf = extracted.rest;
+              extracted = popReadySentence(buf);
+              sentAny = true;
+            }
+            if (buf.trim()) {
+              engine.enqueueSentence(buf.trim(), speechGenId);
+              sentAny = true;
+            }
+            if (!sentAny && reply.trim()) {
+              engine.enqueueSentence(reply.trim(), speechGenId);
+            }
           }
           engine.markStreamComplete(speechGenId);
         }
 
-        // Mémoire évolutive: auto-enregistrement uniquement si autorisé et non sensible
-        if (result.extractedMemories.length > 0) {
-          if (!profile.memoryEnabled) {
-            setMemoryToast("Mémoire désactivée : rien n'a été enregistré.");
-            setTimeout(() => setMemoryToast(null), 4000);
-          } else {
-            let savedCount = 0;
-            let blockedSensitive = 0;
-            for (const fact of result.extractedMemories) {
-              const sensitive = detectSensitiveMemory(fact);
-              if (sensitive && !profile.autoSaveSensitive) {
-                blockedSensitive += 1;
-                void addIntelligenceHistory({
-                  type: "memory_update",
-                  title: "Mémoire sensible non enregistrée automatiquement",
-                  detail: "Une information potentiellement sensible a été détectée dans une demande de mémorisation et n'a pas été enregistrée sans autorisation explicite.",
-                  level: "warning",
-                  relatedConversationId: sessionId,
-                }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
-                continue;
-              }
-              const added = memoryRepository.addMemory(
-                fact,
-                undefined,
-                activeModeRef.current?.id,
-                { source: "assistant", kind: "fact", sensitive }
-              );
-              if (added) {
-                savedCount += 1;
-                void addIntelligenceHistory({
-                  type: "memory_update",
-                  title: "Souvenir enregistré",
-                  detail: added.fact,
-                  level: "info",
-                  relatedConversationId: sessionId,
-                }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
-              }
-            }
-            if (savedCount > 0 || blockedSensitive > 0) {
-              setMemories(memoryRepository.listMemories());
-            }
-            if (blockedSensitive > 0) {
-              setMemoryToast("Information sensible détectée : mémorisation automatique bloquée (autorisation requise).");
-            } else if (savedCount > 0) {
-              setMemoryToast(savedCount === 1 ? "Souvenir enregistré." : `${savedCount} souvenirs enregistrés.`);
-            }
-            if (savedCount > 0 || blockedSensitive > 0) {
-              setTimeout(() => setMemoryToast(null), 4500);
-            }
-          }
-        }
-
+        applyExtractedMemories(extractedMemories);
         if (voiceStateRef.current === "thinking") {
           setVoiceState("idle");
+        }
+      };
+
+      const runOllamaChat = async (brainCtx: any, ollamaModelName: string, displayLabel?: string) => {
+        const historyForApi = (brainCtx.history || [])
+          .filter((m: any) => !m.isPartial && m.text && String(m.text).trim().length > 0)
+          .slice(-14)
+          .map((m: any) => ({ role: m.role, text: m.text }));
+        const resp = await chatWithOllama({
+          model: ollamaModelName,
+          message: brainCtx.message,
+          history: historyForApi,
+          memories: brainCtx.memories,
+          mode: brainCtx.mode,
+          vocalStyle: brainCtx.vocalStyle,
+          intelligenceProfile: brainCtx.intelligenceProfile,
+          projects: (brainCtx.projects || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            objective: p.objective,
+            status: p.status,
+            progress: p.progress,
+            nextActions: p.nextActions || [],
+            blockers: p.blockers || [],
+          })),
+          userTimeZone: brainCtx.userTimeZone,
+        });
+        if (controller.signal.aborted) return { aborted: true as const };
+        const raw = String(resp.reply || "");
+        let tone: JarvisTone = resolvedTurnTone;
+        let withoutTone = raw;
+        const toneMatch = raw.match(/^\s*\[\[TON:\s*([^\]]+)\]\]\s*/i);
+        if (toneMatch) {
+          try {
+            tone = normalizeTone(toneMatch[1]);
+          } catch {
+            tone = resolvedTurnTone;
+          }
+          withoutTone = raw.replace(/^\s*\[\[TON:\s*[^\]]+\]\]\s*/i, "");
+        }
+        const { cleanText, memories: extractedMemories } = extractMemoryTags(withoutTone);
+        const label = displayLabel || resp.model || ollamaModelName;
+        finalizeAssistantReply(
+          cleanText || "(Réponse vide du modèle)",
+          tone,
+          `ollama:${label}`,
+          extractedMemories || []
+        );
+        return { aborted: false as const };
+      };
+
+      const shouldFallbackToOllama = (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err || "");
+        return /503|indisponible|not configured|non configur|GEMINI_API_KEY|Failed to fetch|Network|ECONN|fetch/i.test(msg);
+      };
+
+      try {
+        const profile = intelligenceProfileRef.current;
+        const brainCtx = buildBrainUnifiedContext({
+          message: trimmed,
+          history: priorMessages,
+          activeMode: activeModeRef.current,
+          intelligenceProfile: profile,
+          projects: projectsRef.current,
+          vocalStyle: useVocal
+            ? {
+                emotion: vs.emotion,
+                personality: vs.personality,
+                intensity: vs.intensity,
+                auto: vs.auto,
+                geminiInstruction: vocalPreset?.geminiInstruction,
+              }
+            : null,
+        });
+
+        const runGeminiStreaming = async () => {
+          const result = await streamGeminiResponse({
+            message: brainCtx.message,
+            history: brainCtx.history,
+            memories: brainCtx.memories,
+            mode: brainCtx.mode,
+            vocalStyle: brainCtx.vocalStyle as any,
+            intelligenceProfile: brainCtx.intelligenceProfile,
+            projects: brainCtx.projects,
+            userTimeZone: brainCtx.userTimeZone,
+            signal: controller.signal,
+            onMeta: (model, serverSentiment) => {
+              if (model) setGeminiModel(model);
+              if (serverSentiment) {
+                resolvedTurnTone = serverSentiment.tone;
+                setActiveTone(serverSentiment.tone);
+                engine?.setTurnTone(serverSentiment.tone, speechGenId);
+              }
+            },
+            onTone: (tone) => {
+              resolvedTurnTone = tone;
+              setActiveTone(tone);
+              engine?.setTurnTone(tone, speechGenId);
+              if (assistantCreated) {
+                updateSessionMessages(sessionId, (msgs) =>
+                  msgs.map((m) =>
+                    m.id === assistantMsgId ? { ...m, tone } : m
+                  )
+                );
+              }
+            },
+            onDelta: (cleanAccumulated, newChunk) => {
+              if (!assistantCreated) {
+                assistantCreated = true;
+                setIsSending(false);
+                updateSessionMessages(sessionId, (msgs) => [
+                  ...msgs,
+                  {
+                    id: assistantMsgId,
+                    role: "assistant",
+                    text: cleanAccumulated,
+                    timestamp: Date.now(),
+                    source: engine && !engine.getMuted() ? "voice" : "text",
+                    isPartial: true,
+                    tone: resolvedTurnTone,
+                  },
+                ]);
+              } else {
+                updateSessionMessages(sessionId, (msgs) =>
+                  msgs.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, text: cleanAccumulated, tone: resolvedTurnTone }
+                      : m
+                  )
+                );
+              }
+
+              if (engine && !engine.getMuted()) {
+                ttsSentenceBuffer += newChunk;
+                let extracted = popReadySentence(ttsSentenceBuffer);
+                while (extracted.sentence) {
+                  engine.enqueueSentence(extracted.sentence, speechGenId);
+                  ttsSentenceBuffer = extracted.rest;
+                  extracted = popReadySentence(ttsSentenceBuffer);
+                }
+              }
+            },
+          });
+
+          if (controller.signal.aborted) return { aborted: true as const };
+          finalizeAssistantReply(result.reply, result.tone || resolvedTurnTone, result.model, result.extractedMemories || []);
+          return { aborted: false as const };
+        };
+
+        // Résolution du fournisseur (sélection AI Hub auto/manuelle) avec fallback réel.
+        let providers: any[] = [];
+        let selection: any = null;
+        try {
+          const storedSel = getStoredAiSelection();
+          providers = await loadAiProviderRegistry();
+          selection = selectAiProvider(providers, {
+            mode: storedSel.mode,
+            preferredProvider: storedSel.preferredProvider,
+            capability: "chat",
+          });
+        } catch {
+          providers = [];
+          selection = null;
+        }
+
+        const resolved = selection?.resolvedProvider || null;
+        const isOllamaChat =
+          !!resolved &&
+          (String(resolved.id).startsWith("ollama:") || resolved.providerFamily === "ollama") &&
+          !!resolved.capabilities?.chat &&
+          resolved.status === "available";
+
+        if (isOllamaChat) {
+          const out = await runOllamaChat(brainCtx, resolved.ollamaName || resolved.model || String(resolved.id), resolved.name || resolved.ollamaName);
+          if ((out as any)?.aborted) return;
+        } else {
+          try {
+            const out = await runGeminiStreaming();
+            if ((out as any)?.aborted) return;
+          } catch (geminiErr) {
+            if (controller.signal.aborted) return;
+            const canFallback = shouldFallbackToOllama(geminiErr);
+            if (providers.length === 0) {
+              try { providers = await loadAiProviderRegistry(); } catch { providers = []; }
+            }
+            const ollamaAlt = providers.find((p: any) =>
+              (String(p.id).startsWith("ollama:") || p.providerFamily === "ollama") &&
+              p.status === "available" &&
+              p.capabilities?.chat
+            ) || null;
+            if (canFallback && ollamaAlt) {
+              // Repli réel vers Qwen/Ollama local si Gemini indisponible.
+              ttsSentenceBuffer = "";
+              if (assistantCreated) {
+                updateSessionMessages(sessionId, (msgs) =>
+                  msgs.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, text: "Repli vers un modèle local Ollama…", isPartial: true, tone: resolvedTurnTone }
+                      : m
+                  )
+                );
+              }
+              const out = await runOllamaChat(brainCtx, ollamaAlt.ollamaName || ollamaAlt.model || String(ollamaAlt.id), ollamaAlt.name || ollamaAlt.ollamaName);
+              if ((out as any)?.aborted) return;
+            } else {
+              throw geminiErr;
+            }
+          }
         }
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -804,14 +963,14 @@ export default function App() {
         const detail =
           err instanceof Error
             ? err.message
-            : "Impossible d'obtenir une réponse de l'API Google Gemini.";
+            : "Impossible d'obtenir une réponse de l'IA (Gemini/Ollama).";
         setErrorInfo({
-          title: "Erreur de communication avec Gemini",
+          title: "Erreur de communication IA",
           detail,
         });
         void addIntelligenceHistory({
           type: "error",
-          title: "Erreur Gemini / réseau",
+          title: "Erreur IA / réseau",
           detail,
           level: "warning",
           relatedConversationId: sessionId,
@@ -933,7 +1092,10 @@ export default function App() {
 
     const params = new URLSearchParams(window.location.search);
     const action = params.get("action")?.toLowerCase();
-    const viewParam = params.get("view")?.toLowerCase() as AppView | undefined;
+    const viewParamRaw = params.get("view");
+    const viewParam = viewParamRaw
+      ? (VALID_VIEWS.find((v) => v.toLowerCase() === viewParamRaw.toLowerCase()) ?? undefined)
+      : undefined;
     const query = (params.get("q") || params.get("prompt") || "").trim();
     const wantNew = params.get("new") === "1" || action === "new";
     const wantMute = params.get("mute") === "1";
@@ -942,7 +1104,11 @@ export default function App() {
       return;
     }
 
-    if (viewParam && VALID_VIEWS.includes(viewParam)) {
+    if (query || action === "listen") {
+      skipStartupGreetingRef.current = true;
+    }
+
+    if (viewParam) {
       setActiveView(viewParam);
     }
 
@@ -968,6 +1134,20 @@ export default function App() {
       setSiriListenPending(true);
     }
   }, [submitToGemini]);
+
+  useEffect(() => {
+    if (startupGreetingAttemptedRef.current) return;
+    if (skipStartupGreetingRef.current) return;
+    if (!appPreferences.startupGreetingSpokenEnabled) return;
+    if (hasStartupGreetingBeenSpoken()) {
+      startupGreetingAttemptedRef.current = true;
+      return;
+    }
+
+    startupGreetingAttemptedRef.current = true;
+    markStartupGreetingSpoken();
+    speakPlainText("Salut, je suis JARVIS. Comment pourrais-je vous aider ?");
+  }, [appPreferences.startupGreetingSpokenEnabled, speakPlainText]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
@@ -1030,10 +1210,10 @@ export default function App() {
         setMemories(memoryRepository.listMemories());
         void addIntelligenceHistory({
           type: "memory_update",
-          title: "Souvenir ajouté manuellement",
+          title: "Souvenir ajoutÃ© manuellement",
           detail: added.fact,
           level: "info",
-        }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+        }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
       }
     },
     []
@@ -1046,10 +1226,10 @@ export default function App() {
         setMemories(memoryRepository.listMemories());
         void addIntelligenceHistory({
           type: "memory_update",
-          title: "Souvenir modifié",
+          title: "Souvenir modifiÃ©",
           detail: updated.fact,
           level: "info",
-        }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+        }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
       }
     },
     []
@@ -1068,10 +1248,10 @@ export default function App() {
       setMemories(memoryRepository.listMemories());
       void addIntelligenceHistory({
         type: "memory_update",
-        title: updated.disabled ? "Souvenir désactivé" : "Souvenir réactivé",
+        title: updated.disabled ? "Souvenir dÃ©sactivÃ©" : "Souvenir rÃ©activÃ©",
         detail: updated.fact,
         level: "info",
-      }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+      }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
     }
   }, []);
 
@@ -1080,9 +1260,9 @@ export default function App() {
     setMemories(memoryRepository.listMemories());
     void addIntelligenceHistory({
       type: "memory_update",
-      title: "Souvenir supprimé",
+      title: "Souvenir supprimÃ©",
       level: "warning",
-    }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+    }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
   }, []);
 
   const handleSetMemoryEnabled = useCallback((enabled: boolean) => {
@@ -1093,9 +1273,9 @@ export default function App() {
     });
     void addIntelligenceHistory({
       type: "memory_update",
-      title: enabled ? "Mémoire activée" : "Mémoire désactivée",
+      title: enabled ? "MÃ©moire activÃ©e" : "MÃ©moire dÃ©sactivÃ©e",
       level: "info",
-    }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+    }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
   }, []);
 
   const handleUpdateIntelligenceProfile = useCallback((patch: Partial<IntelligenceProfile>) => {
@@ -1132,7 +1312,7 @@ export default function App() {
   const handleDeleteCustomMode = useCallback(
     async (id: string) => {
       await deleteCustomMode(id);
-      // Les souvenirs contextuels sont détachés (contenu et identifiants préservés).
+      // Les souvenirs contextuels sont dÃ©tachÃ©s (contenu et identifiants prÃ©servÃ©s).
       memoryRepository.removeModeReferences(id);
       setMemories(memoryRepository.listMemories());
       setCustomModes(await listCustomModes());
@@ -1163,13 +1343,13 @@ export default function App() {
       await clearProjects();
       setProjects([]);
     } catch (e) {
-      errors.push(e instanceof Error ? e.message : "Échec de suppression des projets.");
+      errors.push(e instanceof Error ? e.message : "Ã‰chec de suppression des projets.");
     }
     try {
       await clearIntelligenceHistory();
       setIntelligenceHistory([]);
     } catch (e) {
-      errors.push(e instanceof Error ? e.message : "Échec de suppression de l'historique.");
+      errors.push(e instanceof Error ? e.message : "Ã‰chec de suppression de l'historique.");
     }
 
     await clearStoredFiles();
@@ -1270,7 +1450,7 @@ export default function App() {
                   onClick={handleToggleMic}
                   className="mt-2 text-xs font-medium text-cyan-300 hover:text-cyan-200 py-1 cursor-pointer"
                 >
-                  Réessayer le microphone
+                  RÃ©essayer le microphone
                 </button>
               )}
             </div>
@@ -1296,7 +1476,7 @@ export default function App() {
             }`}
           >
             <Check className="w-4 h-4 text-cyan-300 shrink-0" />
-            <span className="truncate">Mémorisé : {memoryToast}</span>
+            <span className="truncate">MÃ©morisÃ© : {memoryToast}</span>
           </div>
         </div>
       )}
@@ -1315,7 +1495,7 @@ export default function App() {
                 isExtremeDark ? "text-cyan-200/85" : "text-cyan-100"
               }`}
             >
-              Raccourci Siri prêt — touchez pour activer le micro.
+              Raccourci Siri prÃªt â€” touchez pour activer le micro.
             </span>
             <button
               type="button"
@@ -1327,7 +1507,7 @@ export default function App() {
               }`}
             >
               <Mic className="w-3.5 h-3.5" />
-              <span>Écouter</span>
+              <span>Ã‰couter</span>
             </button>
           </div>
         </div>
@@ -1367,80 +1547,23 @@ export default function App() {
           getInputLevel={getInputLevel}
           getOutputLevel={getOutputLevel}
           onOrbClick={handleOrbClick}
+          showDailyQuote={appPreferences.showDailyQuote}
         />
       )}
 
       {activeView === "conversations" && (
-        <>
-          <main className="flex-1 min-h-0 max-w-4xl w-full mx-auto flex flex-col items-center px-3 sm:px-6 py-2 sm:py-3 gap-2.5 sm:gap-3">
-            {/* En-tête conversation compact : orb animé conservé, plus d'espace pour le chat */}
-            <section
-              className={`jarvis-stark-panel shrink-0 w-full rounded-2xl px-3 py-2 flex items-center gap-3 ${
-                isExtremeDark ? "text-slate-300" : "text-slate-100"
-              }`}
-            >
-              <JarvisOrb
-                voiceState={effectiveVoiceState}
-                getInputLevel={getInputLevel}
-                getOutputLevel={getOutputLevel}
-                onOrbClick={handleOrbClick}
-                extremeDark={isExtremeDark}
-                compact
-              />
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p
-                  className={`text-[11px] font-mono-tabular font-medium tracking-[0.18em] ${
-                    effectiveVoiceState === "offline"
-                      ? "text-amber-300"
-                      : isExtremeDark
-                      ? "text-cyan-400/65"
-                      : "text-cyan-300"
-                  }`}
-                >
-                  {statusText}
-                  {(effectiveVoiceState === "speaking" ||
-                    effectiveVoiceState === "thinking") &&
-                  activeTone !== "neutral"
-                    ? ` · TON ${activeToneLabel.toUpperCase()}`
-                    : ""}
-                  {isMuted && effectiveVoiceState !== "speaking" ? " · MUET" : ""}
-                </p>
-                <p className={`text-xs ${isExtremeDark ? "text-slate-400" : "text-slate-300"}`}>
-                  {!isOnline
-                    ? "Commandes locales actives (souvenirs, fichiers, heure)"
-                    : liveSentiment && liveSentiment.category !== "neutral"
-                    ? `${liveSentiment.label} → Ton ${liveSentiment.toneLabel.toLowerCase()}`
-                    : effectiveVoiceState === "speaking"
-                    ? "Touchez le noyau ou STOP pour interrompre"
-                    : effectiveVoiceState === "listening"
-                    ? "Parlez naturellement en français"
-                    : effectiveVoiceState === "thinking"
-                    ? "Analyse Gemini en cours…"
-                    : "Touchez le noyau pour parler"}
-                </p>
-              </div>
-            </section>
-
-            {/* Translucent Holographic Conversation Panel */}
-            <section
-              className={`flex-1 min-h-0 w-full rounded-2xl border flex flex-col overflow-hidden transition-colors ${
-                isExtremeDark
-                  ? "bg-black border-white/[0.06]"
-                  : "jarvis-glass border-cyan-400/20"
-              }`}
-            >
-              <TranscriptStream
-                messages={activeSession?.messages ?? []}
-                interimTranscript={interimTranscript}
-                interimSentiment={interimTranscript ? liveSentiment : null}
-                isThinking={isSending}
-                extremeDark={isExtremeDark}
-                onQuickPrompt={handleSendText}
-                onRegenerate={handleRegenerate}
-              />
-            </section>
-          </main>
-
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className={`flex-1 min-h-0 flex flex-col ${isExtremeDark ? "bg-black" : "bg-[#020611]"}`}>
+            <TranscriptStream
+              messages={activeSession?.messages ?? []}
+              interimTranscript={interimTranscript}
+              interimSentiment={interimTranscript ? liveSentiment : null}
+              isThinking={isSending}
+              extremeDark={isExtremeDark}
+              onQuickPrompt={handleSendText}
+              onRegenerate={handleRegenerate}
+            />
+          </div>
           <ControlDock
             voiceState={effectiveVoiceState}
             isMuted={isMuted}
@@ -1457,10 +1580,9 @@ export default function App() {
             }}
             initialDraft={composerDraft}
           />
-        </>
+        </div>
       )}
-
-      {activeView === "memory" && (
+{activeView === "memory" && (
         <MemoryView
           memories={memories}
           extremeDark={isExtremeDark}
@@ -1477,6 +1599,15 @@ export default function App() {
 
       {activeView === "search" && (
         <WebSearchView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          onSpeakText={speakPlainText}
+          initialMode="search"
+        />
+      )}
+
+      {activeView === "research" && (
+        <ResearchView
           isOnline={isOnline}
           extremeDark={isExtremeDark}
           onSpeakText={speakPlainText}
@@ -1506,6 +1637,164 @@ export default function App() {
         <AiVideoStudioView isOnline={isOnline} extremeDark={isExtremeDark} />
       )}
 
+      {activeView === "reels" && (
+        <ReelStudioView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "projects" && (
+        <ProjectsView
+          extremeDark={isExtremeDark}
+          profile={intelligenceProfile}
+          onUpdateProfile={handleUpdateIntelligenceProfile}
+          memories={memories}
+          memoryEnabled={intelligenceProfile.memoryEnabled}
+          onAddMemory={handleAddMemory}
+          onUpdateMemory={handleUpdateMemory}
+          onTogglePinMemory={handleTogglePinMemory}
+          onToggleDisableMemory={handleToggleDisableMemory}
+          onRemoveMemory={handleRemoveMemory}
+          onSetMemoryEnabled={handleSetMemoryEnabled}
+          onReloadMemories={() => setMemories(memoryRepository.listMemories())}
+          projects={projects}
+          projectsLoading={projectsLoading}
+          projectsError={projectsError}
+          onReloadProjects={reloadProjects}
+          onCreateProject={async (name, objective) => {
+            try {
+              const p = await createProject(name, objective);
+              await reloadProjects();
+              void addIntelligenceHistory({ type: "project_update", title: "Projet crÃ©Ã©", detail: p.name, level: "success", relatedProjectId: p.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch(() => {});
+              return p;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Ã‰chec de crÃ©ation du projet.";
+              setProjectsError(msg);
+              throw e instanceof Error ? e : new Error(msg);
+            }
+          }}
+          onSaveProject={async (project) => {
+            try {
+              const saved = await saveProject(project);
+              await reloadProjects();
+              void addIntelligenceHistory({ type: "project_update", title: "Projet mis Ã  jour", detail: saved.name, level: "info", relatedProjectId: saved.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch(() => {});
+              return saved;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'enregistrement du projet.";
+              setProjectsError(msg);
+              throw e instanceof Error ? e : new Error(msg);
+            }
+          }}
+          onRemoveProject={async (id) => {
+            try {
+              await removeProject(id);
+              await reloadProjects();
+              void addIntelligenceHistory({ type: "project_update", title: "Projet supprimÃ©", level: "warning", relatedProjectId: id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch(() => {});
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Ã‰chec de suppression du projet.";
+              setProjectsError(msg);
+              throw e instanceof Error ? e : new Error(msg);
+            }
+          }}
+          history={intelligenceHistory}
+          historyLoading={historyLoading}
+          historyError={historyError}
+          onReloadHistory={reloadHistory}
+          onAddHistory={async (event) => {
+            try {
+              const ev = await addIntelligenceHistory(event);
+              setIntelligenceHistory((prev) => [ev, ...prev]);
+              setHistoryError(null);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'enregistrement de l'historique.";
+              setHistoryError(msg);
+              throw e instanceof Error ? e : new Error(msg);
+            }
+          }}
+          onClearHistory={async () => {
+            try {
+              await clearIntelligenceHistory();
+              setIntelligenceHistory([]);
+              setHistoryError(null);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'effacement de l'historique.";
+              setHistoryError(msg);
+              throw e instanceof Error ? e : new Error(msg);
+            }
+          }}
+          sessions={sessions}
+        />
+      )}
+
+      {activeView === "modes" && (
+        <ModesView
+          extremeDark={isExtremeDark}
+          activeModeId={activeModeId}
+          customModes={customModes}
+          onSelectMode={(id) => {
+            setActiveModeIdState(id);
+            setActiveModeId(id);
+          }}
+          onSaveCustomMode={(mode) => {
+            void (async () => {
+              await saveCustomMode({
+                id: mode.id,
+                name: mode.name,
+                description: mode.description,
+                personality: mode.personality,
+                instructions: mode.instructions,
+                voiceBehavior: mode.voiceBehavior,
+                active: mode.active ?? true,
+              });
+              const refreshed = await listCustomModes();
+              setCustomModes(refreshed);
+            })();
+          }}
+          onDeleteCustomMode={(id) => {
+            void (async () => {
+              await deleteCustomMode(id);
+              const refreshed = await listCustomModes();
+              setCustomModes(refreshed);
+              if (activeModeId === id) {
+                setActiveModeIdState("classic");
+                setActiveModeId("classic");
+              }
+            })();
+          }}
+          onToggleCustomMode={(id, active) => {
+            void (async () => {
+              await setCustomModeActive(id, active);
+              const refreshed = await listCustomModes();
+              setCustomModes(refreshed);
+            })();
+          }}
+          activeMode={activeMode}
+        />
+      )}
+
+      {activeView === "controlCenter" && (
+        <ControlCenterView
+          extremeDark={isExtremeDark}
+          isOnline={isOnline}
+          projects={projects}
+          geminiModel={geminiModel}
+          onSelectView={setActiveView}
+          activeModeName={activeMode?.name || null}
+          memoryCount={memoryRepository.getContextMemories(activeMode?.id).length}
+          memoryEnabled={intelligenceProfile.memoryEnabled}
+        />
+      )}
+
+      {activeView === "aiHub" && (
+        <AiHubView extremeDark={isExtremeDark} isOnline={isOnline} />
+      )}
+
+      {activeView === "imageStudio" && (
+        <ImageStudioView extremeDark={isExtremeDark} isOnline={isOnline} />
+      )}
+
+      {activeView === "mobileAccess" && (
+        <MobileAccessView extremeDark={isExtremeDark} isOnline={isOnline} />
+      )}
+
       {activeView === "intelligence" && (
         <IntelligenceView
           extremeDark={isExtremeDark}
@@ -1528,10 +1817,10 @@ export default function App() {
             try {
               const p = await createProject(name, objective);
               await reloadProjects();
-              void addIntelligenceHistory({ type: "project_update", title: "Projet créé", detail: p.name, level: "success", relatedProjectId: p.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+              void addIntelligenceHistory({ type: "project_update", title: "Projet crÃ©Ã©", detail: p.name, level: "success", relatedProjectId: p.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
               return p;
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Échec de création du projet.";
+              const msg = e instanceof Error ? e.message : "Ã‰chec de crÃ©ation du projet.";
               setProjectsError(msg);
               throw e instanceof Error ? e : new Error(msg);
             }
@@ -1540,10 +1829,10 @@ export default function App() {
             try {
               const saved = await saveProject(project);
               await reloadProjects();
-              void addIntelligenceHistory({ type: "project_update", title: "Projet mis à jour", detail: saved.name, level: "info", relatedProjectId: saved.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+              void addIntelligenceHistory({ type: "project_update", title: "Projet mis Ã  jour", detail: saved.name, level: "info", relatedProjectId: saved.id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
               return saved;
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Échec d'enregistrement du projet.";
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'enregistrement du projet.";
               setProjectsError(msg);
               throw e instanceof Error ? e : new Error(msg);
             }
@@ -1552,9 +1841,9 @@ export default function App() {
             try {
               await removeProject(id);
               await reloadProjects();
-              void addIntelligenceHistory({ type: "project_update", title: "Projet supprimé", level: "warning", relatedProjectId: id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Événement historique non enregistré:", e));
+              void addIntelligenceHistory({ type: "project_update", title: "Projet supprimÃ©", level: "warning", relatedProjectId: id }).then((ev) => setIntelligenceHistory((prev) => [ev, ...prev])).catch((e) => console.warn("Ã‰vÃ©nement historique non enregistrÃ©:", e));
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Échec de suppression du projet.";
+              const msg = e instanceof Error ? e.message : "Ã‰chec de suppression du projet.";
               setProjectsError(msg);
               throw e instanceof Error ? e : new Error(msg);
             }
@@ -1569,7 +1858,7 @@ export default function App() {
               setIntelligenceHistory((prev) => [ev, ...prev]);
               setHistoryError(null);
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Échec d'enregistrement de l'historique.";
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'enregistrement de l'historique.";
               setHistoryError(msg);
               throw e instanceof Error ? e : new Error(msg);
             }
@@ -1580,7 +1869,7 @@ export default function App() {
               setIntelligenceHistory([]);
               setHistoryError(null);
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Échec d'effacement de l'historique.";
+              const msg = e instanceof Error ? e.message : "Ã‰chec d'effacement de l'historique.";
               setHistoryError(msg);
               throw e instanceof Error ? e : new Error(msg);
             }
@@ -1601,6 +1890,14 @@ export default function App() {
           onClearAllLocalData={handleClearAllLocalData}
           vocalStyle={vocalStyle}
           onChangeVocalStyle={setVocalStyle}
+          startupGreetingSpokenEnabled={appPreferences.startupGreetingSpokenEnabled}
+          onChangeStartupGreetingSpokenEnabled={(enabled) =>
+            setAppPreferences((prev) => ({ ...prev, startupGreetingSpokenEnabled: enabled }))
+          }
+          showDailyQuote={appPreferences.showDailyQuote}
+          onChangeShowDailyQuote={(enabled) =>
+            setAppPreferences((prev) => ({ ...prev, showDailyQuote: enabled }))
+          }
         />
       )}
 
@@ -1634,3 +1931,5 @@ export default function App() {
     </NavShell>
   );
 }
+
+

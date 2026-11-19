@@ -1,23 +1,26 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Brain,
-  Clapperboard,
   FileText,
   Film,
   FolderKanban,
   Globe,
   History,
+  Home,
+  LayoutDashboard,
   Menu,
   MessageSquare,
   Microscope,
+  MonitorSmartphone,
   Newspaper,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
   Share2,
+  SlidersHorizontal,
   Trash2,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import type { AppView, ConversationSession } from "../types/jarvis";
 
@@ -43,19 +46,20 @@ interface NavEntry {
 }
 
 const NAV_ENTRIES: NavEntry[] = [
-  { id: "new", label: "Nouveau chat", icon: Plus, action: "new" },
-  { id: "search-conv", label: "Rechercher dans les conversations", icon: Search, action: "history" },
-  { id: "history", label: "Historique des conversations", icon: History, action: "history" },
-  { id: "intelligence", label: "Projets", icon: FolderKanban, view: "intelligence" },
+  { id: "new", label: "Nouvelle conversation", icon: Plus, action: "new" },
+  { id: "history", label: "Historique", icon: History, action: "history" },
+  { id: "home", label: "Accueil", icon: Home, view: "home" },
+  { id: "projects", label: "Projets", icon: FolderKanban, view: "projects" },
   { id: "memory", label: "Mémoire", icon: Brain, view: "memory" },
-  { id: "modes", label: "Modes", icon: Settings, view: "settings" },
+  { id: "modes", label: "Modes", icon: SlidersHorizontal, view: "modes" },
   { id: "news", label: "Actualités", icon: Newspaper, view: "news" },
   { id: "search", label: "Recherche Web", icon: Globe, view: "search" },
-  { id: "deep", label: "Recherche approfondie", icon: Microscope, view: "search" },
+  { id: "research", label: "Recherche approfondie", icon: Microscope, view: "research" },
   { id: "files", label: "Analyse de fichiers", icon: FileText, view: "files" },
   { id: "video", label: "Studio vidéo", icon: Film, view: "video" },
-  { id: "aiVideo", label: "Studio vidéo IA", icon: Clapperboard, view: "aiVideo" },
   { id: "social", label: "Social Hub", icon: Share2, view: "social" },
+  { id: "control", label: "Centre de contrôle", icon: LayoutDashboard, view: "controlCenter" },
+  { id: "mobile", label: "Accès mobile", icon: MonitorSmartphone, view: "mobileAccess" },
   { id: "settings", label: "Paramètres", icon: Settings, view: "settings" },
 ];
 
@@ -111,14 +115,14 @@ export function ChatSidebar({
   };
 
   const panelClass = extremeDark
-    ? "bg-black border-white/[0.06]"
-    : "bg-[#050A14]/95 border-cyan-400/15";
+    ? "bg-black/95 border-white/[0.06]"
+    : "bg-[#040916]/95 border-cyan-400/15";
   const itemClass = (active: boolean) =>
-    `w-full min-h-[44px] flex items-center gap-3 rounded-xl px-3 text-left text-xs transition-colors cursor-pointer ${
+    `w-full min-h-[42px] flex items-center gap-3 rounded-xl px-3 text-left text-[13px] transition-colors cursor-pointer ${
       active
         ? extremeDark
-          ? "bg-cyan-950/40 text-cyan-200 border border-cyan-500/30"
-          : "bg-cyan-500/15 text-cyan-100 border border-cyan-400/30"
+          ? "bg-cyan-950/40 text-cyan-100 border border-cyan-500/30"
+          : "bg-cyan-500/15 text-cyan-50 border border-cyan-400/30"
         : extremeDark
         ? "text-slate-300 hover:bg-white/[0.04] border border-transparent"
         : "text-slate-300 hover:bg-cyan-500/10 border border-transparent"
@@ -127,12 +131,12 @@ export function ChatSidebar({
   return (
     <aside
       className={`hidden lg:flex shrink-0 flex-col border-r transition-[width] duration-200 ${panelClass} ${
-        collapsed ? "w-[68px]" : "w-[268px]"
+        collapsed ? "w-[68px]" : "w-[272px]"
       }`}
     >
       {/* Header */}
       <div className="h-14 shrink-0 flex items-center gap-2 px-3 border-b border-white/[0.06]">
-        <div className={`jarvis-stark-glow w-8 h-8 rounded-lg grid place-items-center shrink-0 ${extremeDark ? "bg-cyan-500/15" : "bg-cyan-500/20"}`}>
+        <div className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${extremeDark ? "bg-cyan-500/15" : "bg-cyan-500/20"} border border-cyan-400/20`}>
           <span className={`text-sm font-display font-semibold ${extremeDark ? "text-cyan-300" : "text-cyan-200"}`}>J</span>
         </div>
         {!collapsed && (
@@ -145,7 +149,7 @@ export function ChatSidebar({
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           className="w-9 h-9 grid place-items-center rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer shrink-0"
-          aria-label={collapsed ? "Déployer la sidebar" : "Replier la sidebar"}
+          aria-label={collapsed ? "Déployer la barre latérale" : "Replier la barre latérale"}
           title={collapsed ? "Déployer" : "Replier"}
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
@@ -175,8 +179,8 @@ export function ChatSidebar({
               aria-label="Rechercher dans les conversations"
               className={`w-full h-10 pl-9 pr-3 rounded-xl border text-xs outline-none ${
                 extremeDark
-                  ? "bg-black border-white/[0.08] text-slate-200 placeholder:text-slate-600"
-                  : "bg-[#050A14] border-cyan-400/20 text-slate-100 placeholder:text-slate-500"
+                  ? "bg-black border-white/[0.08] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40"
+                  : "bg-[#050A14] border-cyan-400/20 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400/40"
               }`}
             />
           </div>
@@ -184,7 +188,7 @@ export function ChatSidebar({
       </div>
 
       {/* Nav modules */}
-      <nav className="px-3 space-y-1 jarvis-scroll overflow-y-auto shrink-0 max-h-[42%]">
+      <nav className="px-3 space-y-1 jarvis-scroll overflow-y-auto shrink-0 max-h-[46%]" aria-label="Navigation principale">
         {NAV_ENTRIES.map((entry) => {
           const Icon = entry.icon;
           const active = entry.view ? entry.view === activeView : false;
@@ -207,7 +211,7 @@ export function ChatSidebar({
       {/* Recent conversations */}
       <div className="flex-1 min-h-0 flex flex-col mt-3 border-t border-white/[0.06] pt-3">
         {!collapsed && (
-          <p className={`px-3 pb-2 text-[10px] uppercase tracking-wider ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
+          <p className={`px-3 pb-2 text-[10px] uppercase tracking-[0.16em] ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
             Conversations récentes
           </p>
         )}
@@ -241,7 +245,7 @@ export function ChatSidebar({
                       type="button"
                       onClick={() => onSelectSession(s.id)}
                       onDoubleClick={() => { setEditingId(s.id); setEditTitle(s.title); }}
-                      className={`flex-1 min-w-0 min-h-[44px] px-3 text-left cursor-pointer ${collapsed ? "px-0 flex justify-center" : ""}`}
+                      className={`flex-1 min-w-0 min-h-[42px] px-3 text-left cursor-pointer ${collapsed ? "px-0 flex justify-center" : ""}`}
                       title={`${s.title} — double-cliquez pour renommer`}
                       aria-label={`Ouvrir la conversation ${s.title}`}
                     >
@@ -281,10 +285,10 @@ export function ChatSidebar({
           type="button"
           onClick={onOpenHistory}
           className={`${itemClass(false)} ${collapsed ? "justify-center px-0" : ""}`}
-          title="Historique, mémoire et Raccourcis Siri"
+          title="Historique des sessions"
         >
           <History className="w-4 h-4 shrink-0" />
-          {!collapsed && <span>Historique &amp; Siri</span>}
+          {!collapsed && <span>Historique & sessions</span>}
         </button>
         {collapsed && (
           <button type="button" onClick={() => setCollapsed(false)} className="w-full h-9 grid place-items-center text-slate-500 hover:text-slate-200 cursor-pointer" aria-label="Menu">
