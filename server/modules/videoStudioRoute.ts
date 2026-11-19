@@ -256,8 +256,11 @@ function renderFormat(
         compositionId,
         outputPath,
         `--props=${propsPath}`,
-        // Limite mémoire : 1080×1920 × plusieurs onglets Chrome peut saturer la machine.
-        "--concurrency=2",
+        // Render free tier : 1 CPU / 512 Mo. Un seul onglet Chrome et une
+        // échelle réduite évitent l'OOM ; le rendu reste valide en 540×960 / 960×540.
+        "--concurrency=1",
+        "--scale=0.5",
+        "--crf=20",
       ],
       { cwd: process.cwd(), env: process.env, windowsHide: true }
     );
@@ -308,7 +311,7 @@ function renderFormat(
       finish(
         new Error(
           detail
-            ? `Échec du rendu Remotion : ${detail.slice(-600)}`
+            ? `Échec du rendu Remotion : ${detail.slice(-1600)}`
             : `Échec du rendu Remotion (code ${code ?? "inconnu"}).`
         )
       );
