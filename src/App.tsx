@@ -142,6 +142,16 @@ function prosodyToTts(p: { rate: number; pitch: number; expressiveness: number }
   };
 }
 
+/** Mobile-first : sur petit écran, l'application s'ouvre directement sur le chat. */
+function getInitialView(): AppView {
+  if (typeof window === "undefined") return "home";
+  try {
+    return window.matchMedia("(max-width: 1023px)").matches ? "conversations" : "home";
+  } catch {
+    return "home";
+  }
+}
+
 const VALID_VIEWS: AppView[] = [
   "dashboard",
   "home",
@@ -219,7 +229,7 @@ function popReadySentence(buffer: string): {
 export default function App() {
   const isOnline = useOnlineStatus();
 
-  const [activeView, setActiveView] = useState<AppView>("home");
+  const [activeView, setActiveView] = useState<AppView>(getInitialView);
   const [composerDraft, setComposerDraft] = useState("");
   const [sessions, setSessions] = useState<ConversationSession[]>(() => {
     const list = conversationRepository.listSessions();
@@ -581,6 +591,7 @@ export default function App() {
     const created = conversationRepository.createSession();
     setSessions(conversationRepository.listSessions());
     setActiveSessionId(created.id);
+    setActiveView("conversations");
     setErrorInfo(null);
   }, [stopAllActivity]);
 
@@ -1611,7 +1622,10 @@ export default function App() {
           onNewSession={handleNewSession}
           onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession}
-          onOpenHistory={() => setIsDrawerOpen(true)}
+          onOpenHistory={() => {
+            onClose();
+            setIsDrawerOpen(true);
+          }}
         />
       )}
     >
