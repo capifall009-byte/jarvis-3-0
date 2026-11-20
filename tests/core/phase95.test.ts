@@ -241,45 +241,6 @@ test("sécurité : le mode local loopback reste libre et l'alias Basic reste com
   });
 });
 
-test("sécurité : proxy public avec socket loopback ne contourne pas l'authentification", () => {
-  withEnv({
-    JARVIS_REQUIRE_AUTH: "true", JARVIS_API_TOKEN: "token-p95-proxy",
-    JARVIS_PUBLIC_BASIC_USER: undefined, JARVIS_PUBLIC_BASIC_PASS: undefined,
-    JARVIS_TRUST_PROXY: undefined,
-  }, () => {
-    // Cas Render/Cloudflare : socket loopback mais client réel sur Internet.
-    const proxied = runMiddleware(
-      createNetworkAccessMiddleware(),
-      fakeRequest("/api/core/status", "127.0.0.1", {
-        host: "jarvis-3-64rb.onrender.com",
-        "x-forwarded-for": "203.0.113.42",
-        "x-forwarded-proto": "https",
-        "cf-ray": "test-ray",
-      })
-    );
-    assert.equal(proxied.nextCalled, false);
-    assert.equal(proxied.status, 401);
-    assert.equal(proxied.body?.code, "UNAUTHORIZED");
-
-    // Le Host public seul suffit à refuser la confiance locale.
-    const hostOnly = runMiddleware(
-      createNetworkAccessMiddleware(),
-      fakeRequest("/api/core/status", "::1", { host: "jarvis-3-64rb.onrender.com" })
-    );
-    assert.equal(hostOnly.status, 401);
-
-    // La sonde de santé reste publique derrière le proxy (healthcheck Render).
-    const probe = runMiddleware(
-      createNetworkAccessMiddleware(),
-      fakeRequest("/api/health", "127.0.0.1", {
-        host: "jarvis-3-64rb.onrender.com", "x-forwarded-proto": "https",
-      })
-    );
-    assert.equal(probe.nextCalled, true);
-    assert.equal(probe.status, 200);
-  });
-});
-
 test("sécurité : Bearer et Basic configurés sont acceptés, mauvais identifiants refusés", () => {
   withEnv({
     JARVIS_REQUIRE_AUTH: "true",

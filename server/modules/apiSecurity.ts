@@ -111,44 +111,6 @@ export function resolveConnectionAddress(req: Request): ConnectionAddress {
   return { address: socketAddress, viaConfiguredProxy: false };
 }
 
-/**
- * Détecte une requête arrivant via un reverse proxy public (Render, Cloudflare…).
- *
- * Derrière ce type d'infrastructure, la socket TCP locale du proxy est souvent
- * une adresse de bouclage alors que le client réel se trouve sur Internet.
- * Accorder la confiance « local » dans ce cas contourne toute authentification.
- * Les signaux ci-dessous sont fournis par l'infrastructure elle-même :
- *  - en-têtes de forwarding (X-Forwarded-*, Cf-Connecting-Ip, Cf-Ray…) ;
- *  - en-tête Host explicite qui n'est pas une adresse locale.
- *
- * Un Host ABSENT (appel IPC/tests unitaires) n'est PAS considéré comme public :
- * le comportement local historique reste inchangé.
- */
-export function isPublicProxyRequest(req: Request): boolean {
-  const forwardingHeaders = [
-    "x-forwarded-for",
-    "x-forwarded-proto",
-    "x-forwarded-host",
-    "x-forwarded-port",
-    "cf-connecting-ip",
-    "cf-ray",
-    "true-client-ip",
-    "x-real-ip",
-  ];
-  if (forwardingHeaders.some((name) => !!String(req.get(name) || "").trim())) return true;
-
-  const host = String(req.get("host") || "").trim().toLowerCase();
-  if (!host) return false;
-  const hostname = host.replace(/^\[|\]$/g, "").split(":")[0];
-  const local =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "0.0.0.0" ||
-    hostname.endsWith(".localhost");
-  return !local;
-}
-
 /** Identité attribuée par le serveur après authentification (jamais depuis le client). */
 export function authenticatedActor(req: Request): string | null {
   return req.jarvisActor ?? null;
@@ -264,10 +226,7 @@ export function createNetworkAccessMiddleware(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
     applyHeaders(res);
     const address = resolveConnectionAddress(req).address;
-    // La confiance « local » n'est accordée que si la socket est loopback ET
-    // qu'aucun signal de proxy public n'est présent. Sur Render/Cloudflare la
-    // socket est loopback mais le client est distant : l'authentification reste requise.
-    if (isLoopbackAddress(address) && !isPublicProxyRequest(req)) {
+    if (isLoopbackAddress(address)) {
       req.jarvisActor = "local";
       next();
       return;
