@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "JARVIS 3.0 — Assistant Personnel IA",
-  "short_name": "JARVIS",
-  "description": "Assistant personnel holographique inspiré de Tony Stark, propulsé par Google Gemini et optimisé pour iPhone 11 et Windows.",
+  "name": "JARVIS 4.0 — Assistant Personnel IA",
+  "short_name": "JARVIS 4.0",
+  "description": "Assistant personnel holographique inspiré de Tony Stark, propulsé par Google Gemini et optimisé pour iPhone et Windows.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#030509",
-  "theme_color": "#030509",
+  "background_color": "#05080d",
+  "theme_color": "#05080d",
   "lang": "fr",
   "icons": [
     {
@@ -31,6 +31,12 @@
     }
   ],
   "shortcuts": [
+    {
+      "name": "Tableau de bord",
+      "short_name": "Tableau de bord",
+      "description": "Ouvrir le tableau de bord unifié du Core",
+      "url": "/?view=dashboard"
+    },
     {
       "name": "Parler à JARVIS",
       "short_name": "Parler",

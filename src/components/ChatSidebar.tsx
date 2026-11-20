@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import {
+  Bot,
   Brain,
+  BrainCircuit,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -10,6 +13,7 @@ import {
   History,
   Home,
   Image as ImageIcon,
+  Layers,
   LayoutDashboard,
   MessageSquarePlus,
   Microscope,
@@ -22,8 +26,10 @@ import {
   Share2,
   SlidersHorizontal,
   Sparkles,
+  Target,
   Trash2,
   Video,
+  Wrench,
   Clapperboard,
   X,
 } from "lucide-react";
@@ -47,7 +53,15 @@ interface ChatSidebarProps {
 type NavItem = { label: string; view: AppView; icon: any };
 
 const PRIMARY_TOOLS: NavItem[] = [
+  { label: "Tableau de bord", view: "dashboard", icon: LayoutDashboard },
   { label: "Cerveau central", view: "intelligence", icon: Brain },
+  { label: "Missions (Core 4.0)", view: "missions", icon: Target },
+  { label: "Compétences (Skills)", view: "skills", icon: Layers },
+  { label: "Agents (Core 4.0)", view: "agents", icon: Bot },
+  { label: "Planificateur (Core 4.0)", view: "scheduler", icon: CalendarClock },
+  { label: "Outils (Core 4.0)", view: "tools", icon: Wrench },
+  { label: "Appareils (Core 4.0)", view: "devices", icon: MonitorSmartphone },
+  { label: "Mémoire contextuelle (Core 4.0)", view: "contextMemory", icon: BrainCircuit },
   { label: "AI Hub", view: "aiHub", icon: Sparkles },
   { label: "Studio Images", view: "imageStudio", icon: ImageIcon },
   { label: "Centre de contrôle", view: "controlCenter", icon: LayoutDashboard },
@@ -62,7 +76,7 @@ const MORE_MODULES: NavItem[] = [
   { label: "Analyse de fichiers", view: "files", icon: FileText },
   { label: "Recherche approfondie", view: "research", icon: Microscope },
   { label: "Studio vidéo", view: "video", icon: Film },
-  { label: "Studio vidéo IA", view: "aiVideo", icon: Clapperboard },
+  { label: "Studio Remotion", view: "remotionStudio", icon: Clapperboard },
   { label: "Reels", view: "reels", icon: Video },
   { label: "Actualités", view: "news", icon: Newspaper },
   { label: "Social Hub", view: "social", icon: Share2 },
@@ -98,7 +112,7 @@ export function ChatSidebar({
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(compact);
 
   const filteredSessions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -114,7 +128,7 @@ export function ChatSidebar({
   const bg = extremeDark ? "bg-black" : "bg-[#030914]";
   const border = extremeDark ? "border-white/[0.06]" : "border-cyan-400/15";
   const muted = extremeDark ? "text-slate-400" : "text-slate-400";
-  const itemBase = `w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-colors cursor-pointer`;
+  const itemBase = `w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-sm transition-colors cursor-pointer`;
 
   const navBtn = (item: NavItem) => {
     const active = activeView === item.view;
@@ -231,9 +245,9 @@ export function ChatSidebar({
                       </button>
                     )}
                     {!isEditing && (
-                      <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button type="button" onClick={() => startRename(s)} className="inline-flex items-center justify-center w-6 h-6 rounded-md text-slate-500 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer" title="Renommer"><Pencil className="w-3 h-3" /></button>
-                        <button type="button" onClick={() => onDeleteSession(s.id)} className="inline-flex items-center justify-center w-6 h-6 rounded-md text-slate-500 hover:text-red-300 hover:bg-white/[0.05] cursor-pointer" title="Supprimer"><Trash2 className="w-3 h-3" /></button>
+                      <div className={`mt-1 flex items-center gap-1 ${compact ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                        <button type="button" onClick={() => startRename(s)} className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg text-slate-500 hover:text-cyan-300 hover:bg-white/[0.05] cursor-pointer" title="Renommer" aria-label="Renommer la conversation"><Pencil className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => onDeleteSession(s.id)} className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg text-slate-500 hover:text-red-300 hover:bg-white/[0.05] cursor-pointer" title="Supprimer" aria-label="Supprimer la conversation"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     )}
                   </div>

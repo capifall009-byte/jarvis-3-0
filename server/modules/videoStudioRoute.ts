@@ -30,6 +30,59 @@ import {
 const GENERATED_ROOT = path.resolve(process.cwd(), "public", "generated");
 const AUDIO_ROOT = path.resolve(process.cwd(), "remotion", "public", "generated");
 const PROPS_ROOT = path.resolve(process.cwd(), "server", ".data", "video-studio");
+
+/** Phase 9.5 : identifiant de job strictement alphanumérique (généré localement). */
+const JOB_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export class InvalidJobIdError extends Error {
+  readonly code = "INVALID_JOB_ID";
+  constructor() {
+    super("Identifiant de job vidéo invalide.");
+  }
+}
+
+/** Refuse absolus, `..`, séparateurs, NUL, encodages et tout caractère inattendu. */
+export function validateJobId(value: unknown): string {
+  const id = String(value ?? "");
+  // La regex interdit séparateurs, NUL, espaces et encodages divers.
+  // `path.isAbsolute()` écarte explicitement les chemins absolus.
+  if (!JOB_ID_PATTERN.test(id) || path.isAbsolute(id) || id.includes("/") || id.includes("\\")) {
+    throw new InvalidJobIdError();
+  }
+  return id;
+}
+
+function isStrictlyInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+/**
+ * Résout un chemin de suppression avec défense en profondeur :
+ * validateur d'ID, containment lexical, realpath (liens symboliques inclus),
+ * vérification du type de ressource. Retourne null si la cible n'existe pas.
+ */
+export async function resolveSafeJobPath(root: string, value: unknown): Promise<string | null> {
+  const id = validateJobId(value);
+  const candidate = path.resolve(root, id);
+  if (!isStrictlyInside(root, candidate)) throw new InvalidJobIdError();
+
+  const realRoot = await fs.realpath(root).catch(() => null);
+  const realRootStat = realRoot ? await fs.stat(realRoot).catch(() => null) : null;
+  if (!realRoot || !realRootStat?.isDirectory()) throw new InvalidJobIdError();
+
+  const linkCheck = await fs.lstat(candidate).catch(() => null);
+  if (!linkCheck) return null;
+  if (linkCheck.isSymbolicLink() || (!linkCheck.isDirectory() && !linkCheck.isFile())) {
+    throw new InvalidJobIdError();
+  }
+
+  const realCandidate = await fs.realpath(candidate).catch(() => null);
+  if (!realCandidate || !isStrictlyInside(realRoot, realCandidate)) throw new InvalidJobIdError();
+  const stat = await fs.stat(realCandidate);
+  if (!stat.isDirectory() && !stat.isFile()) throw new InvalidJobIdError();
+  return realCandidate;
+}
 const ENTRY_POINT = "remotion/index.ts";
 const RENDER_TIMEOUT_MS = 20 * 60 * 1000;
 
@@ -565,7 +618,13 @@ export function createVideoStudioRouter(): Router {
   });
 
   router.delete("/video-studio/jobs/:id", async (req: Request, res: Response) => {
-    const id = String(req.params.id ?? "");
+    let id: string;
+    try {
+      id = validateJobId(req.params.id);
+    } catch {
+      res.status(400).json({ ok: false, code: "INVALID_JOB_ID", error: "Identifiant de job vidéo invalide." });
+      return;
+    }
     const job = jobs.get(id);
 
     if (job && isRunning(job)) {
@@ -581,13 +640,21 @@ export function createVideoStudioRouter(): Router {
       return;
     }
 
-    jobs.delete(id);
-    await Promise.all([
-      fs.rm(path.join(GENERATED_ROOT, id), { recursive: true, force: true }),
-      fs.rm(path.join(AUDIO_ROOT, id), { recursive: true, force: true }),
-      fs.rm(path.join(PROPS_ROOT, id), { recursive: true, force: true }),
-    ]);
-    res.json({ ok: true });
+    try {
+      // Toutes les cibles sont résolues et validées AVANT la première suppression.
+      const targets = await Promise.all([
+        resolveSafeJobPath(GENERATED_ROOT, id),
+        resolveSafeJobPath(AUDIO_ROOT, id),
+        resolveSafeJobPath(PROPS_ROOT, id),
+      ]);
+      for (const target of targets) {
+        if (target) await fs.rm(target, { recursive: true, force: false });
+      }
+      jobs.delete(id);
+      res.json({ ok: true });
+    } catch {
+      res.status(400).json({ ok: false, code: "INVALID_JOB_ID", error: "Chemin de suppression refusé." });
+    }
   });
 
   return router;

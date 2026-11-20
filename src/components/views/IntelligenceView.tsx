@@ -558,8 +558,8 @@ export function IntelligenceView(props: IntelligenceViewProps) {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-cyan-200 font-medium"><Target className="w-4 h-4" />Projets</div>
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => void onReloadProjects()} className={btnGhost} title="Recharger les projets" disabled={projectsLoading || projectBusy}><RefreshCw className={`w-4 h-4 ${projectsLoading ? "animate-spin" : ""}`} /></button>
-                        <button type="button" onClick={handleExportProjects} className={btnGhost} title="Exporter les projets" disabled={projectBusy}><Download className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => void onReloadProjects()} className={btnGhost} title="Recharger les projets" aria-label="Recharger les projets" disabled={projectsLoading || projectBusy}><RefreshCw className={`w-4 h-4 ${projectsLoading ? "animate-spin" : ""}`} /></button>
+                        <button type="button" onClick={handleExportProjects} className={btnGhost} title="Exporter les projets" aria-label="Exporter les projets" disabled={projectBusy}><Download className="w-4 h-4" /></button>
                       </div>
                     </div>
                     <label className={`${btnGhost} justify-center w-full relative ${projectBusy ? "opacity-40 pointer-events-none" : ""}`}>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   X,
@@ -54,6 +54,26 @@ export function HistoryDrawer({
   const [tab, setTab] = useState<"history" | "memory" | "siri">("history");
   const [newFact, setNewFact] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  // Phase 9 : fermeture au clavier (Escape) et focus initial dans le dialogue.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const frame = requestAnimationFrame(() => {
+      dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    });
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      cancelAnimationFrame(frame);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -93,6 +113,7 @@ export function HistoryDrawer({
       <div className="flex-1" onClick={onClose} />
 
       <aside
+        ref={dialogRef}
         className={`w-full max-w-md h-full border-l flex flex-col pt-safe pb-safe ${
           extremeDark
             ? "bg-black border-white/[0.05]"

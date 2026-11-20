@@ -200,19 +200,26 @@ export function ControlDock({
   const shell = extremeDark
     ? "border-white/[0.08] bg-[#05080f]/95"
     : "border-cyan-400/20 bg-[#050A14]/80 backdrop-blur-md";
-  const iconBtn = `inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl border transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none`;
+  const iconBtn = `inline-flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl border transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none touch-manipulation`;
   const accept = "image/*,application/pdf,.pdf,.txt,.md,.csv,.json,.xml,.html,.htm,.js,.ts,.tsx,.jsx,.py,.css,.yaml,.yml,.log,.doc,.docx,.rtf,.odt,text/*";
 
+  const handleComposerFocus = () => {
+    // Aide iOS/Android à garder le champ visible quand le clavier s'ouvre
+    window.setTimeout(() => {
+      textAreaRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 120);
+  };
+
   return (
-    <div className="w-full px-3 pb-3 sm:px-6 shrink-0 border-t border-transparent">
-      <div className={`max-w-3xl mx-auto rounded-2xl border ${shell} px-2.5 py-2 sm:px-3 sm:py-2.5 shadow-lg shadow-cyan-950/10`}>
+    <div className="w-full px-2 sm:px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] shrink-0 border-t border-transparent">
+      <div className={`max-w-3xl mx-auto rounded-2xl border ${shell} px-2 py-2 sm:px-3 sm:py-2.5 shadow-lg shadow-cyan-950/10`}>
         {(attachments.length > 0 || attachError || isReading) && (
           <div className="px-1 pb-2 space-y-2">
             {attachError && (
-              <div className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/25 rounded-lg px-2.5 py-1.5">{attachError}</div>
+              <div role="alert" aria-live="assertive" className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/25 rounded-lg px-2.5 py-1.5">{attachError}</div>
             )}
             {isReading && (
-              <div className="inline-flex items-center gap-2 text-xs text-cyan-300"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Lecture des pièces jointes…</div>
+              <div role="status" aria-live="polite" className="inline-flex items-center gap-2 text-xs text-cyan-300"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Lecture des pièces jointes…</div>
             )}
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -291,6 +298,7 @@ export function ControlDock({
                 setDraft(val);
                 onDraftChange?.(val);
               }}
+              onFocus={handleComposerFocus}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -298,9 +306,10 @@ export function ControlDock({
                 }
               }}
               rows={1}
+              enterKeyHint="send"
               placeholder={isOffline ? "Mode hors ligne : commandes locales (analyse IA indisponible)…" : "Écrire un message à JARVIS…"}
               aria-label="Message pour JARVIS"
-              className={`w-full min-h-[44px] max-h-40 resize-none px-4 py-2.5 rounded-xl border focus:outline-none text-[15px] leading-relaxed transition-colors ${
+              className={`w-full min-h-[44px] max-h-40 resize-none px-3.5 sm:px-4 py-2.5 rounded-xl border focus:outline-none text-[16px] sm:text-[15px] leading-relaxed transition-colors ${
                 extremeDark
                   ? "bg-black/60 border-white/[0.06] focus:border-cyan-500/40 text-slate-100 placeholder:text-slate-600"
                   : "bg-[#050A14]/70 border-cyan-400/15 focus:border-cyan-400/45 text-slate-100 placeholder:text-slate-500"

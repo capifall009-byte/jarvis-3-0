@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "test:core": "tsx --test tests/core/phase2.test.ts tests/core/phase3.test.ts tests/core/phase4.test.ts tests/core/phase5.test.ts tests/core/phase6.test.ts tests/core/phase7.test.ts tests/core/phase8.test.ts tests/core/phase95.test.ts",
+    "test:security": "tsx --test tests/core/phase95.test.ts",
     "reel:audio": "node remotion/scripts/generate-audio.mjs",
     "story:audio": "node remotion/scripts/generate-story-audio.mjs",
     "story:render": "remotion render remotion/index.ts DernierSignal out/dernier-signal.mp4",

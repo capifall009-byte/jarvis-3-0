@@ -130,7 +130,7 @@ export function SettingsView({
             et intégration Raccourcis Siri.
           </p>
           <p className={`text-[11px] ${extremeDark ? "text-cyan-400/75" : "text-cyan-300"}`}>
-            JARVIS 3.0 · Créé par Abdourahmane Fall, alias Capzo (Capzo IA).
+            JARVIS 4.0 · Créé par Abdourahmane Fall, alias Capzo (Capzo IA).
           </p>
         </header>
 
@@ -444,7 +444,7 @@ export function SettingsView({
 
           {isInstalled ? (
             <p className="text-xs text-cyan-300">
-              JARVIS 3.0 est installé comme application autonome sur cet appareil.
+              JARVIS 4.0 est installé comme application autonome sur cet appareil.
             </p>
           ) : isIOS ? (
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -456,7 +456,7 @@ export function SettingsView({
             !isInstallable && (
               <p className="text-xs text-slate-400">
                 Sur Windows (Edge ou Chrome), utilisez l&apos;icône d&apos;installation
-                dans la barre d&apos;adresse pour épingler JARVIS 3.0.
+                dans la barre d&apos;adresse pour épingler JARVIS 4.0.
               </p>
             )
           )}

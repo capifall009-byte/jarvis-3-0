@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Mic, X } from "lucide-react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ControlDock } from "./components/ControlDock";
@@ -6,25 +6,42 @@ import { HistoryDrawer } from "./components/HistoryDrawer";
 import { JarvisOrb } from "./components/JarvisOrb";
 import { NavShell } from "./components/NavShell";
 import { TranscriptStream } from "./components/TranscriptStream";
-import { FilesView } from "./components/views/FilesView";
-import { HomeView } from "./components/views/HomeView";
-import { MemoryView } from "./components/views/MemoryView";
-import { SettingsView } from "./components/views/SettingsView";
-import { NewsView } from "./components/views/NewsView";
-import { SocialHubView } from "./components/views/SocialHubView";
+import { ViewFallback } from "./components/ViewFallback";
 import { ModeSelector } from "./components/ModeSelector";
-import { VideoView } from "./components/views/VideoView";
-import { AiVideoStudioView } from "./components/views/AiVideoStudioView";
-import { ReelStudioView } from "./components/views/ReelStudioView";
-import { WebSearchView } from "./components/views/WebSearchView";
-import { IntelligenceView } from "./components/views/IntelligenceView";
-import { ProjectsView } from "./components/views/ProjectsView";
-import { ModesView } from "./components/views/ModesView";
-import { ResearchView } from "./components/views/ResearchView";
-import { ControlCenterView } from "./components/views/ControlCenterView";
-import { AiHubView } from "./components/views/AiHubView";
-import { ImageStudioView } from "./components/views/ImageStudioView";
-import { MobileAccessView } from "./components/views/MobileAccessView";
+import { HomeView } from "./components/views/HomeView";
+
+/**
+ * Phase 9 : chargement différé des vues. Le shell, le chat et l'accueil restent
+ * immédiats ; les 26 autres vues — dont les plus lourdes (WebSearchView,
+ * IntelligenceView, VideoView/FFmpeg) — ne sont téléchargées qu'à la demande.
+ * Aucune fonctionnalité n'est supprimée.
+ */
+const FilesView = lazy(() => import("./components/views/FilesView").then((m) => ({ default: m.FilesView })));
+const MemoryView = lazy(() => import("./components/views/MemoryView").then((m) => ({ default: m.MemoryView })));
+const SettingsView = lazy(() => import("./components/views/SettingsView").then((m) => ({ default: m.SettingsView })));
+const NewsView = lazy(() => import("./components/views/NewsView").then((m) => ({ default: m.NewsView })));
+const SocialHubView = lazy(() => import("./components/views/SocialHubView").then((m) => ({ default: m.SocialHubView })));
+const VideoView = lazy(() => import("./components/views/VideoView").then((m) => ({ default: m.VideoView })));
+const AiVideoStudioView = lazy(() => import("./components/views/AiVideoStudioView").then((m) => ({ default: m.AiVideoStudioView })));
+const RemotionStudioView = lazy(() => import("./components/views/RemotionStudioView").then((m) => ({ default: m.RemotionStudioView })));
+const ReelStudioView = lazy(() => import("./components/views/ReelStudioView").then((m) => ({ default: m.ReelStudioView })));
+const WebSearchView = lazy(() => import("./components/views/WebSearchView").then((m) => ({ default: m.WebSearchView })));
+const IntelligenceView = lazy(() => import("./components/views/IntelligenceView").then((m) => ({ default: m.IntelligenceView })));
+const ProjectsView = lazy(() => import("./components/views/ProjectsView").then((m) => ({ default: m.ProjectsView })));
+const ModesView = lazy(() => import("./components/views/ModesView").then((m) => ({ default: m.ModesView })));
+const ResearchView = lazy(() => import("./components/views/ResearchView").then((m) => ({ default: m.ResearchView })));
+const ControlCenterView = lazy(() => import("./components/views/ControlCenterView").then((m) => ({ default: m.ControlCenterView })));
+const AiHubView = lazy(() => import("./components/views/AiHubView").then((m) => ({ default: m.AiHubView })));
+const ImageStudioView = lazy(() => import("./components/views/ImageStudioView").then((m) => ({ default: m.ImageStudioView })));
+const MobileAccessView = lazy(() => import("./components/views/MobileAccessView").then((m) => ({ default: m.MobileAccessView })));
+const MissionsView = lazy(() => import("./components/views/MissionsView").then((m) => ({ default: m.MissionsView })));
+const SkillsView = lazy(() => import("./components/views/SkillsView").then((m) => ({ default: m.SkillsView })));
+const AgentsView = lazy(() => import("./components/views/AgentsView").then((m) => ({ default: m.AgentsView })));
+const SchedulerView = lazy(() => import("./components/views/SchedulerView").then((m) => ({ default: m.SchedulerView })));
+const ToolsView = lazy(() => import("./components/views/ToolsView").then((m) => ({ default: m.ToolsView })));
+const DevicesView = lazy(() => import("./components/views/DevicesView").then((m) => ({ default: m.DevicesView })));
+const ContextMemoryView = lazy(() => import("./components/views/ContextMemoryView").then((m) => ({ default: m.ContextMemoryView })));
+const CommandHubView = lazy(() => import("./components/views/CommandHubView").then((m) => ({ default: m.CommandHubView })));
 import { buildBrainUnifiedContext } from "./services/brain/BrainContext";
 import { AudioEngine } from "./services/audio/AudioEngine";
 import {
@@ -47,6 +64,7 @@ import {
   type AppPreferences,
 } from "./services/preferences/AppPreferences";
 import { streamGeminiResponse, extractMemoryTags } from "./services/gemini/GeminiClient";
+import { coreClient } from "./services/core/CoreClient";
 import { analyzeImageWithOllama, chatWithOllama } from "./services/ai/AiProvidersClient";
 import { getStoredAiSelection, loadAiProviderRegistry, selectAiProvider } from "./services/ai/AiProviderManager";
 import { detectSensitiveMemory, memoryRepository } from "./services/memory/MemoryRepository";
@@ -125,6 +143,7 @@ function prosodyToTts(p: { rate: number; pitch: number; expressiveness: number }
 }
 
 const VALID_VIEWS: AppView[] = [
+  "dashboard",
   "home",
   "conversations",
   "memory",
@@ -133,6 +152,7 @@ const VALID_VIEWS: AppView[] = [
   "files",
   "video",
   "aiVideo",
+  "remotionStudio",
   "reels",
   "settings",
   "news",
@@ -144,6 +164,13 @@ const VALID_VIEWS: AppView[] = [
   "aiHub",
   "imageStudio",
   "mobileAccess",
+  "missions",
+  "skills",
+  "agents",
+  "scheduler",
+  "tools",
+  "devices",
+  "contextMemory",
 ];
 
 function createMsgId(): string {
@@ -327,7 +354,7 @@ export default function App() {
     document.documentElement.classList.toggle("extreme-dark", isExtremeDark);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) {
-      themeMeta.setAttribute("content", isExtremeDark ? "#000000" : "#020408");
+      themeMeta.setAttribute("content", isExtremeDark ? "#000000" : "#05080d");
     }
     try {
       localStorage.setItem(EXTREME_DARK_STORAGE_KEY, String(isExtremeDark));
@@ -494,6 +521,27 @@ export default function App() {
     setIsSending(false);
     setVoiceState("idle");
   }, []);
+
+  /** STOP GLOBAL : arrêt local + interruption des missions actives du noyau. */
+  const stopGlobal = useCallback(() => {
+    stopAllActivity();
+    void coreClient.stopAll("STOP GLOBAL (interface)").catch((err) => {
+      console.warn("[core] STOP GLOBAL indisponible :", err);
+    });
+  }, [stopAllActivity]);
+
+  /** Phase 9 — handlers du tableau de bord : le Core reste la source de vérité. */
+  const handleDashboardStop = useCallback(() => {
+    stopAllActivity();
+    return coreClient.stopAll("STOP GLOBAL (tableau de bord)").catch((err) => {
+      console.warn("[core] STOP GLOBAL indisponible :", err);
+    });
+  }, [stopAllActivity]);
+
+  const handleDashboardResume = useCallback(() =>
+    coreClient.resumeCore("Reprise depuis le tableau de bord").catch((err) => {
+      console.warn("[core] reprise indisponible :", err);
+    }), []);
 
   const speakPlainText = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -1681,7 +1729,18 @@ export default function App() {
         </div>
       </div>
 
-      {/* Active View Router */}
+      {/* Active View Router — Phase 9 : vues différées chargées à la demande. */}
+      <Suspense fallback={<ViewFallback label="Chargement du module" />}>
+      {activeView === "dashboard" && (
+        <CommandHubView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          onSelectView={setActiveView}
+          onStop={handleDashboardStop}
+          onResume={handleDashboardResume}
+        />
+      )}
+
       {activeView === "home" && (
         <HomeView
           extremeDark={isExtremeDark}
@@ -1724,7 +1783,7 @@ export default function App() {
             isOffline={!isOnline}
             extremeDark={isExtremeDark}
             onToggleMic={handleToggleMic}
-            onStopAll={stopAllActivity}
+            onStopAll={stopGlobal}
             onToggleMute={handleToggleMute}
             onSendText={handleSendText}
             onDraftChange={(text) => {
@@ -1788,6 +1847,14 @@ export default function App() {
 
       {activeView === "aiVideo" && (
         <AiVideoStudioView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "remotionStudio" && (
+        <RemotionStudioView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          onNavigate={setActiveView}
+        />
       )}
 
       {activeView === "reels" && (
@@ -1948,6 +2015,47 @@ export default function App() {
         <MobileAccessView extremeDark={isExtremeDark} isOnline={isOnline} />
       )}
 
+      {activeView === "missions" && (
+        <MissionsView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          onNavigate={setActiveView}
+        />
+      )}
+
+      {activeView === "skills" && (
+        <SkillsView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          onNavigate={setActiveView}
+        />
+      )}
+
+      {activeView === "agents" && (
+        <AgentsView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "scheduler" && (
+        <SchedulerView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "tools" && (
+        <ToolsView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "devices" && (
+        <DevicesView isOnline={isOnline} extremeDark={isExtremeDark} />
+      )}
+
+      {activeView === "contextMemory" && (
+        <ContextMemoryView
+          isOnline={isOnline}
+          extremeDark={isExtremeDark}
+          memories={memories}
+          sessions={sessions}
+        />
+      )}
+
       {activeView === "intelligence" && (
         <IntelligenceView
           extremeDark={isExtremeDark}
@@ -2065,6 +2173,7 @@ export default function App() {
       {activeView === "social" && (
         <SocialHubView isOnline={isOnline} extremeDark={isExtremeDark} />
       )}
+      </Suspense>
 
       {/* Session Switcher & Quick Archives Drawer */}
       <HistoryDrawer

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { AppView, ConversationSession, ProjectItem, VoiceState } from "../../types/jarvis";
 import { JarvisOrb } from "../JarvisOrb";
+import { HudCore, type HudCoreState } from "../hud/HudCore";
 import { getDailyQuote } from "../../services/quotes/dailyQuote";
 
 interface HomeViewProps {
@@ -40,6 +41,27 @@ interface HomeViewProps {
 }
 
 const STARTUP_GREETING_TEXT = "Salut, je suis JARVIS. Comment pourrais-je vous aider ?";
+
+/** Traduction de l'état vocal réel vers l'état du noyau HUD — aucune invention. */
+const CORE_STATE: Record<VoiceState, HudCoreState> = {
+  idle: "idle",
+  connecting: "thinking",
+  listening: "listening",
+  speaking: "speaking",
+  thinking: "thinking",
+  offline: "offline",
+  error: "error",
+};
+
+const CORE_STATE_LABEL: Record<HudCoreState, string> = {
+  idle: "VEILLE",
+  listening: "ÉCOUTE",
+  thinking: "TRAITEMENT",
+  speaking: "RÉPONSE",
+  error: "ERREUR",
+  offline: "HORS LIGNE",
+  stopped: "STOP GLOBAL",
+};
 
 const SHORTCUTS: Array<{ id: AppView; label: string; desc: string; icon: typeof Brain }> = [
   { id: "conversations", label: "Conversations", desc: "Discuter avec JARVIS", icon: MessageSquare },
@@ -97,7 +119,8 @@ export function HomeView({
     [projects]
   );
 
-  const card = `rounded-2xl border ${extremeDark ? "bg-black/60 border-white/[0.06]" : "jarvis-glass border-cyan-400/15"}`;
+  const coreState = CORE_STATE[voiceState];
+  const card = `hud-panel rounded-2xl border ${extremeDark ? "bg-black/60 border-white/[0.06]" : "jarvis-glass border-cyan-400/15"}`;
   const muted = extremeDark ? "text-slate-400" : "text-slate-300";
   const title = extremeDark ? "text-slate-100" : "text-cyan-50";
 
@@ -112,19 +135,21 @@ export function HomeView({
           </div>
           <div className="relative flex flex-col items-center text-center gap-4">
             {onOrbClick && getInputLevel && getOutputLevel && (
-              <div className="pt-1 pb-2">
-                <JarvisOrb
-                  voiceState={voiceState}
-                  getInputLevel={getInputLevel}
-                  getOutputLevel={getOutputLevel}
-                  onOrbClick={onOrbClick}
-                  extremeDark={extremeDark}
-                />
+              <div className="pt-2 pb-6">
+                <HudCore state={coreState} label={CORE_STATE_LABEL[coreState]}>
+                  <JarvisOrb
+                    voiceState={voiceState}
+                    getInputLevel={getInputLevel}
+                    getOutputLevel={getOutputLevel}
+                    onOrbClick={onOrbClick}
+                    extremeDark={extremeDark}
+                  />
+                </HudCore>
               </div>
             )}
 
             <div className="space-y-2 max-w-2xl">
-              <p className={`text-[11px] uppercase tracking-[0.22em] ${extremeDark ? "text-cyan-300/80" : "text-cyan-300"}`}>JARVIS 3.0</p>
+              <p className={`text-[11px] uppercase tracking-[0.22em] ${extremeDark ? "text-cyan-300/80" : "text-cyan-300"}`}>JARVIS 4.0</p>
               <h1 className={`font-display text-2xl sm:text-4xl font-medium leading-tight ${title}`}>
                 {STARTUP_GREETING_TEXT}
               </h1>
@@ -245,7 +270,7 @@ export function HomeView({
         </section>
 
         <p className={`text-[11px] flex items-center gap-1.5 justify-center sm:justify-start ${extremeDark ? "text-slate-500" : "text-slate-400"}`}>
-          JARVIS 3.0 · Créé par Abdourahmane Fall, alias Capzo (Capzo IA). <ArrowRight className="w-3 h-3" />
+          JARVIS 4.0 · Créé par Abdourahmane Fall, alias Capzo (Capzo IA). <ArrowRight className="w-3 h-3" />
         </p>
       </div>
     </div>

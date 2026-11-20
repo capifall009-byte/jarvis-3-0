@@ -2,6 +2,17 @@
 
 @layer base {
   :root {
+    /* ---- JARVIS 4.0 : palette HUD centralisée ---- */
+    --hud-bg: #05080d;
+    --hud-bg-2: #090f18;
+    --hud-blue: #087bff;
+    --hud-cyan: #00d9ff;
+    --hud-holo: #38bdf8;
+    --hud-text: #eaf6ff;
+    --hud-muted: #8495a8;
+    --hud-border: rgba(0, 217, 255, 0.16);
+    --hud-glow: rgba(0, 217, 255, 0.12);
+
     --font-display: 'Outfit', system-ui, sans-serif;
     --font-sans: 'DM Sans', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -12,8 +23,8 @@
   #root {
     height: 100%;
     min-height: 100dvh;
-    background-color: #030509;
-    color: #f1f5f9;
+    background-color: var(--hud-bg);
+    color: var(--hud-text);
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: contain;
@@ -45,11 +56,11 @@
 }
 
 .jarvis-holo-canvas {
-  background-color: #02050b;
+  background-color: var(--hud-bg);
   background-image:
-    radial-gradient(ellipse at 50% -10%, rgba(30, 64, 175, 0.18), transparent 55%),
-    radial-gradient(ellipse at 85% 20%, rgba(6, 182, 212, 0.08), transparent 40%),
-    linear-gradient(180deg, #02050b 0%, #040a16 45%, #02050b 100%);
+    radial-gradient(ellipse at 50% -10%, rgba(8, 123, 255, 0.16), transparent 55%),
+    radial-gradient(ellipse at 88% 18%, rgba(0, 217, 255, 0.07), transparent 42%),
+    linear-gradient(180deg, var(--hud-bg) 0%, var(--hud-bg-2) 48%, var(--hud-bg) 100%);
 }
 
 html.extreme-dark .jarvis-holo-canvas {
@@ -58,13 +69,13 @@ html.extreme-dark .jarvis-holo-canvas {
 }
 
 .jarvis-glass {
-  background-color: rgba(7, 14, 28, 0.72);
+  background-color: rgba(9, 15, 24, 0.78);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-color: rgba(34, 211, 238, 0.14);
+  border-color: var(--hud-border);
   box-shadow:
-    inset 0 1px 0 rgba(103, 232, 249, 0.08),
-    0 10px 30px rgba(2, 6, 18, 0.4);
+    inset 0 1px 0 rgba(56, 189, 248, 0.12),
+    0 10px 30px rgba(0, 0, 0, 0.42);
 }
 
 html.extreme-dark .jarvis-glass {
@@ -182,16 +193,24 @@ html.extreme-dark .jarvis-stark-panel {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   letter-spacing: 0.005em;
+  overflow-x: hidden;
+}
+
+/* Mobile/PWA: éviter les débordements horizontaux et améliorer le tactile */
+.jarvis-app-shell img,
+.jarvis-app-shell video,
+.jarvis-app-shell canvas {
+  max-width: 100%;
 }
 
 /* Panneaux : la classe jarvis-glass est utilisée par la majorité des vues */
 .jarvis-app-shell .jarvis-glass {
   background:
-    linear-gradient(160deg, rgba(8, 18, 36, 0.86) 0%, rgba(4, 10, 22, 0.92) 60%, rgba(3, 7, 16, 0.96) 100%);
-  border-color: rgba(34, 211, 238, 0.16);
+    linear-gradient(160deg, rgba(9, 15, 24, 0.9) 0%, rgba(5, 8, 13, 0.94) 60%, rgba(5, 8, 13, 0.97) 100%);
+  border-color: var(--hud-border);
   box-shadow:
-    inset 0 1px 0 rgba(103, 232, 249, 0.1),
-    0 12px 32px rgba(1, 4, 12, 0.45);
+    inset 0 1px 0 rgba(56, 189, 248, 0.14),
+    0 12px 32px rgba(0, 0, 0, 0.48);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -273,6 +292,319 @@ html.extreme-dark .jarvis-stark-composer {
   box-shadow: none !important;
 }
 
+/* ---------- Phase 9 : accessibilité, chargement et cohérence visuelle ---------- */
+
+/* Lien d'évitement : visible uniquement au focus clavier. */
+.jarvis-skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  background: #061426;
+  color: #a5f3fc;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.jarvis-skip-link:focus {
+  transform: translateY(0);
+}
+
+/* Focus clavier visible partout, y compris là où `focus:outline-none` est utilisé. */
+.jarvis-app-shell :focus-visible,
+:focus-visible {
+  outline: 2px solid #22d3ee !important;
+  outline-offset: 2px !important;
+  border-radius: 0.375rem;
+}
+.jarvis-app-shell button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.28) !important;
+}
+
+/* Cible tactile minimale pour les commandes d'icône. */
+.jarvis-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Squelette de chargement des vues différées : sobre, lisible, non fatigant. */
+.jarvis-view-fallback {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+.jarvis-view-fallback__ring {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(34, 211, 238, 0.18);
+  border-top-color: rgba(34, 211, 238, 0.9);
+  animation: jarvis-spin 900ms linear infinite;
+}
+.jarvis-view-fallback__bar {
+  height: 0.4rem;
+  width: 9rem;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(34, 211, 238, 0.28), rgba(34, 211, 238, 0.08));
+  background-size: 200% 100%;
+  animation: jarvis-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes jarvis-spin { to { transform: rotate(360deg); } }
+@keyframes jarvis-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Hiérarchie visuelle unifiée des cartes de statistiques. */
+.jarvis-stat-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.jarvis-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  color: #a5f3fc;
+}
+
+/* ==========================================================================
+   JARVIS 4.0 — HUD DESIGN SYSTEM
+   Classes additionnelles, sans rupture des composants existants.
+   Uniquement transform/opacity/box-shadow : pas de filtre coûteux.
+   ========================================================================== */
+
+.hud-panel {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid var(--hud-border);
+  background: linear-gradient(160deg, rgba(9, 15, 24, 0.92) 0%, rgba(5, 8, 13, 0.97) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(56, 189, 248, 0.12),
+    inset 0 0 30px rgba(8, 123, 255, 0.03),
+    0 14px 38px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Équerres d'angle : lecture « instrument » sans bruit visuel. */
+.hud-panel::before,
+.hud-panel::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0.75;
+}
+.hud-panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid rgba(0, 217, 255, 0.7);
+  border-left: 1px solid rgba(0, 217, 255, 0.7);
+  border-top-left-radius: 1rem;
+}
+.hud-panel::after {
+  right: -1px;
+  bottom: -1px;
+  border-right: 1px solid rgba(0, 217, 255, 0.5);
+  border-bottom: 1px solid rgba(0, 217, 255, 0.5);
+  border-bottom-right-radius: 1rem;
+}
+
+html.extreme-dark .hud-panel {
+  background: linear-gradient(160deg, #05070c 0%, #000000 100%);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(103, 232, 249, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.hud-card {
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.hud-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 217, 255, 0.42);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(0, 217, 255, 0.1);
+}
+.hud-card:active { transform: translateY(0); }
+
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--hud-border);
+  border-radius: 9999px;
+  background: rgba(8, 123, 255, 0.08);
+  padding: 0.2rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-holo);
+  white-space: nowrap;
+}
+
+.hud-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--hud-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.12);
+}
+.hud-status-dot--pulse { animation: hudPulse 2.2s ease-in-out infinite; }
+
+.hud-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.28), transparent);
+}
+
+/* Grille de fond très discrète, appliquée uniquement au HUD racine. */
+.hud-grid-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(0, 217, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 217, 255, 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black, transparent 72%);
+}
+
+/* ---- Noyau holographique : états réels uniquement ---- */
+.hud-core {
+  --hud-core-accent: var(--hud-cyan);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 240px;
+  height: 240px;
+  max-width: 100%;
+  isolation: isolate;
+}
+.hud-core[data-state="listening"] { --hud-core-accent: #00d9ff; }
+.hud-core[data-state="thinking"] { --hud-core-accent: #087bff; }
+.hud-core[data-state="speaking"] { --hud-core-accent: #38bdf8; }
+.hud-core[data-state="error"] { --hud-core-accent: #f87171; }
+.hud-core[data-state="offline"] { --hud-core-accent: #fbbf24; }
+.hud-core[data-state="stopped"] { --hud-core-accent: #fb923c; }
+
+.hud-core__halo {
+  position: absolute;
+  inset: 18%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--hud-core-accent) 22%, transparent), transparent 70%);
+  animation: hudPulse 3.4s ease-in-out infinite;
+}
+.hud-core__sweep {
+  position: absolute;
+  inset: 4%;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, color-mix(in srgb, var(--hud-core-accent) 22%, transparent) 350deg, transparent 360deg);
+  animation: hudSpin 7s linear infinite;
+}
+.hud-core__ring {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--hud-core-accent) 30%, transparent);
+}
+.hud-core__ring--outer {
+  inset: 0;
+  border-style: dashed;
+  opacity: 0.6;
+  animation: hudSpin 26s linear infinite;
+}
+.hud-core__ring--middle {
+  inset: 13%;
+  border-color: color-mix(in srgb, var(--hud-core-accent) 45%, transparent);
+  animation: hudSpinRev 16s linear infinite;
+}
+.hud-core__ring--inner {
+  inset: 27%;
+  border-color: color-mix(in srgb, var(--hud-core-accent) 65%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--hud-core-accent) 18%, transparent), inset 0 0 22px color-mix(in srgb, var(--hud-core-accent) 12%, transparent);
+}
+.hud-core__particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--hud-core-accent);
+  box-shadow: 0 0 8px var(--hud-core-accent);
+  opacity: 0.75;
+}
+.hud-core__particle--a { top: 6%; left: 50%; animation: hudPulse 2.8s ease-in-out infinite; }
+.hud-core__particle--b { bottom: 14%; right: 12%; animation: hudPulse 3.6s ease-in-out infinite reverse; }
+.hud-core__particle--c { top: 30%; left: 8%; animation: hudPulse 4.2s ease-in-out infinite; }
+.hud-core__content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+}
+.hud-core[data-state="stopped"] .hud-core__sweep { animation: none; opacity: 0.2; }
+
+@keyframes hudSpin { to { transform: rotate(360deg); } }
+@keyframes hudSpinRev { to { transform: rotate(-360deg); } }
+@keyframes hudPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.42; } }
+@keyframes hudEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hudScan {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.hud-enter { animation: hudEnter 320ms ease-out both; }
+
+.hud-scanline {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.hud-scanline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.07), transparent);
+  animation: hudScan 5s linear infinite;
+}
+
+/* Balayage holographique des en-têtes de module */
+.hud-title {
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 18px rgba(0, 217, 255, 0.18);
+}
+
+/* ---- Mobile : densité adaptée et animations allégées ---- */
+@media (max-width: 640px) {
+  .hud-core { width: 184px; height: 184px; }
+  .hud-core__ring--outer { border-style: solid; }
+  .hud-panel::before,
+  .hud-panel::after { width: 10px; height: 10px; }
+  .hud-grid-bg::before { background-size: 32px 32px; opacity: 0.1; }
+  .hud-scanline { display: none; }
+  .jarvis-app-shell h1 { letter-spacing: -0.01em; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -281,4 +613,14 @@ html.extreme-dark .jarvis-stark-composer {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .jarvis-view-fallback__ring,
+  .jarvis-view-fallback__bar,
+  .hud-core__sweep,
+  .hud-core__ring,
+  .hud-core__halo,
+  .hud-core__particle,
+  .hud-scanline::after {
+    animation: none !important;
+  }
+  .hud-grid-bg::before { display: none; }
 }

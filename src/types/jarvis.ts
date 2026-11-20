@@ -1,6 +1,7 @@
 import type { JarvisTone, SentimentAnalysis } from "../../shared/sentiment.ts";
 
 export type AppView =
+  | "dashboard"
   | "home"
   | "conversations"
   | "memory"
@@ -9,6 +10,7 @@ export type AppView =
   | "files"
   | "video"
   | "aiVideo"
+  | "remotionStudio"
   | "reels"
   | "settings"
   | "news"
@@ -19,7 +21,14 @@ export type AppView =
   | "controlCenter"
   | "aiHub"
   | "imageStudio"
-  | "mobileAccess";
+  | "mobileAccess"
+  | "missions"
+  | "skills"
+  | "agents"
+  | "scheduler"
+  | "tools"
+  | "devices"
+  | "contextMemory";
 
 export type VoiceState =
   | "idle"

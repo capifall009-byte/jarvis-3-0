@@ -1,28 +1,38 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Bot,
   Brain,
+  BrainCircuit,
+  CalendarClock,
   Clapperboard,
+  Command,
+  Cpu,
   FileText,
   Film,
   FolderKanban,
   Globe,
   History,
   Home,
+  Layers,
   LayoutDashboard,
   Menu,
   MessageSquare,
   Microscope,
   MonitorSmartphone,
   Moon,
+  MoreHorizontal,
   Newspaper,
   Plus,
   Settings,
   Share2,
   SlidersHorizontal,
+  Target,
+  Wrench,
   WifiOff,
   X,
 } from "lucide-react";
 import type { AppView, VoiceState } from "../types/jarvis";
+import { HudTopBar, type HudStatusTone } from "./hud/HudTopBar";
 
 interface NavShellProps {
   activeView: AppView;
@@ -52,27 +62,41 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Tableau de bord", mobileLabel: "Tableau de bord", icon: Command, view: "dashboard" },
+  { id: "home", label: "Accueil JARVIS", mobileLabel: "Accueil", icon: Home, view: "home" },
+  { id: "chat", label: "Chat principal", mobileLabel: "Chat", icon: MessageSquare, view: "conversations" },
   { id: "new", label: "Nouvelle conversation", mobileLabel: "Nouveau", icon: Plus, action: "new" },
-  { id: "history", label: "Historique", mobileLabel: "Historique", icon: History, action: "history" },
-  { id: "home", label: "Accueil", mobileLabel: "Accueil", icon: Home, view: "home" },
+  { id: "intelligence", label: "Cerveau central", mobileLabel: "Cerveau", icon: Cpu, view: "intelligence" },
+  { id: "aiHub", label: "AI Hub", mobileLabel: "AI Hub", icon: LayoutDashboard, view: "aiHub" },
+  { id: "imageStudio", label: "Studio Images", mobileLabel: "Images", icon: FileText, view: "imageStudio" },
+  { id: "video", label: "Studio Vidéo", mobileLabel: "Vidéo", icon: Film, view: "video" },
+  { id: "remotionStudio", label: "Studio Vidéo (Remotion)", mobileLabel: "Remotion", icon: Clapperboard, view: "remotionStudio" },
   { id: "projects", label: "Projets", mobileLabel: "Projets", icon: FolderKanban, view: "projects" },
+  { id: "control", label: "Centre de contrôle", mobileLabel: "Contrôle", icon: LayoutDashboard, view: "controlCenter" },
+  { id: "missions", label: "Missions (Core 4.0)", mobileLabel: "Missions", icon: Target, view: "missions" },
+  { id: "skills", label: "Compétences (Skills)", mobileLabel: "Skills", icon: Layers, view: "skills" },
+  { id: "agents", label: "Agents (Core 4.0)", mobileLabel: "Agents", icon: Bot, view: "agents" },
+  { id: "scheduler", label: "Planificateur (Core 4.0)", mobileLabel: "Planif.", icon: CalendarClock, view: "scheduler" },
+  { id: "tools", label: "Outils (Core 4.0)", mobileLabel: "Outils", icon: Wrench, view: "tools" },
+  { id: "devices", label: "Appareils (Core 4.0)", mobileLabel: "Appareils", icon: MonitorSmartphone, view: "devices" },
+  { id: "contextMemory", label: "Mémoire contextuelle (Core 4.0)", mobileLabel: "Contexte", icon: BrainCircuit, view: "contextMemory" },
   { id: "memory", label: "Mémoire", mobileLabel: "Mémoire", icon: Brain, view: "memory" },
-  { id: "modes", label: "Modes", mobileLabel: "Modes", icon: SlidersHorizontal, view: "modes" },
-  { id: "news", label: "Actualités", mobileLabel: "Actus", icon: Newspaper, view: "news" },
   { id: "search", label: "Recherche Web", mobileLabel: "Web", icon: Globe, view: "search" },
   { id: "research", label: "Recherche approfondie", mobileLabel: "Approf.", icon: Microscope, view: "research" },
-  { id: "files", label: "Analyse de fichiers", mobileLabel: "Fichiers", icon: FileText, view: "files" },
-  { id: "video", label: "Studio vidéo", mobileLabel: "Vidéo", icon: Film, view: "video" },
-  { id: "reels", label: "Générateur vidéo", mobileLabel: "Gén. vidéo", icon: Clapperboard, view: "reels" },
+  { id: "news", label: "Actualités", mobileLabel: "Actus", icon: Newspaper, view: "news" },
   { id: "social", label: "Social Hub", mobileLabel: "Social", icon: Share2, view: "social" },
-  { id: "control", label: "Centre de contrôle", mobileLabel: "Contrôle", icon: LayoutDashboard, view: "controlCenter" },
+  { id: "history", label: "Historique", mobileLabel: "Historique", icon: History, action: "history" },
+  { id: "files", label: "Analyse de fichiers", mobileLabel: "Fichiers", icon: FileText, view: "files" },
+  { id: "aiVideo", label: "Studio Vidéo IA", mobileLabel: "Vidéo IA", icon: Film, view: "aiVideo" },
+  { id: "reels", label: "Générateur vidéo / Reels", mobileLabel: "Reels", icon: Clapperboard, view: "reels" },
+  { id: "modes", label: "Modes", mobileLabel: "Modes", icon: SlidersHorizontal, view: "modes" },
   { id: "mobile", label: "Accès mobile", mobileLabel: "Mobile", icon: MonitorSmartphone, view: "mobileAccess" },
   { id: "settings", label: "Paramètres", mobileLabel: "Réglages", icon: Settings, view: "settings" },
 ];
 
-// Navigation basse mobile discrète (accès rapide)
+// Navigation basse mobile : rubriques principales + accès menu secondaire
 const MOBILE_QUICK: NavItem[] = NAV_ITEMS.filter((i) =>
-  ["home", "new", "projects", "control", "settings"].includes(i.id)
+  ["dashboard", "home", "chat", "aiHub", "projects", "control"].includes(i.id)
 );
 
 export function NavShell({
@@ -91,6 +115,67 @@ export function NavShell({
   mobileSidebarSlot,
 }: NavShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Phase 9 : le menu mobile est un dialogue modal — Escape ferme, le focus
+  // entre dans le menu à l'ouverture, revient au bouton à la fermeture et reste
+  // piégé tant que le menu est ouvert.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const focusableSelector = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+    const getFocusable = () =>
+      Array.from(mobileMenuRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileMenuOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusables = getFocusable();
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const frame = requestAnimationFrame(() => { getFocusable()[0]?.focus(); });
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      cancelAnimationFrame(frame);
+    };
+  }, [mobileMenuOpen]);
+
+  // Le clavier virtuel réduit la hauteur visible (visualViewport) sans toujours
+  // modifier 100dvh. On suit cette hauteur pour garder la zone de saisie visible.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      setViewportHeight(vv.height);
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOpen(inset > 120);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
 
   const isActiveVoice =
     voiceState === "listening" ||
@@ -114,6 +199,18 @@ export function NavShell({
       ? "text-slate-400"
       : "text-cyan-200/85";
 
+  const statusTone: HudStatusTone =
+    voiceState === "error"
+      ? "error"
+      : voiceState === "offline" || !isOnline
+      ? "warn"
+      : voiceState === "listening" ||
+        voiceState === "speaking" ||
+        voiceState === "thinking" ||
+        voiceState === "connecting"
+      ? "busy"
+      : "ok";
+
   const runItem = (item: NavItem) => {
     if (item.action === "new") {
       onNewSession();
@@ -131,10 +228,14 @@ export function NavShell({
   return (
     <div
       data-jarvis-ui="stark"
-      className={`jarvis-app-shell h-[100dvh] w-full flex flex-col lg:flex-row overflow-hidden transition-colors ${
+      className={`jarvis-app-shell hud-grid-bg relative w-full flex flex-col lg:flex-row overflow-hidden transition-colors ${
         extremeDark ? "bg-black text-slate-300" : "jarvis-holo-canvas text-slate-100"
       }`}
+      style={{ height: viewportHeight ? `${viewportHeight}px` : "100dvh" }}
     >
+      {/* Phase 9 : lien d'évitement clavier vers le contenu principal. */}
+      <a href="#jarvis-main" className="jarvis-skip-link">Aller au contenu principal</a>
+
       {/* Desktop sidebar */}
       {sidebarSlot ?? (
         <aside
@@ -145,7 +246,7 @@ export function NavShell({
           <div className={`px-5 py-5 border-b ${extremeDark ? "border-white/[0.05]" : "border-cyan-400/12"}`}>
             <div className="flex items-baseline justify-between gap-2">
               <span className={`font-display text-xl font-semibold tracking-[0.26em] ${extremeDark ? "text-cyan-200/80" : "text-cyan-50"}`}>JARVIS</span>
-              <span className={`text-[11px] font-mono-tabular ${extremeDark ? "text-slate-600" : "text-cyan-400/75"}`}>3.0</span>
+              <span className={`text-[11px] font-mono-tabular ${extremeDark ? "text-slate-600" : "text-cyan-400/75"}`}>4.0</span>
             </div>
             <div className="mt-2.5 flex items-center gap-2 text-xs">
               {!isOnline && <WifiOff className="w-3.5 h-3.5 text-amber-300 shrink-0" />}
@@ -203,97 +304,118 @@ export function NavShell({
 
       {/* Main + Mobile chrome */}
       <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
-        {/* Mobile header */}
+        {/* Mobile header (HUD compact) */}
         <header
-          className={`lg:hidden shrink-0 pt-safe border-b ${
-            extremeDark ? "border-white/[0.04] bg-black" : "jarvis-glass border-cyan-400/15"
+          className={`lg:hidden shrink-0 pt-safe border-b hud-panel rounded-none ${
+            extremeDark ? "border-white/[0.04] bg-black" : "border-cyan-400/15"
           }`}
         >
-          <div className="h-13 px-3 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Ouvrir le menu"
-              className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl cursor-pointer ${extremeDark ? "text-slate-300" : "text-slate-200"}`}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className={`font-display text-base font-semibold tracking-[0.24em] ${extremeDark ? "text-cyan-200/80" : "text-cyan-50"}`}>JARVIS</span>
-              <span className={`text-[10px] font-mono-tabular ${extremeDark ? "text-slate-600" : "text-cyan-400/70"}`}>3.0</span>
-            </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button type="button" onClick={onToggleExtremeDark} aria-pressed={extremeDark} aria-label={extremeDark ? "Désactiver le mode sombre extrême" : "Activer le mode sombre extrême"} className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl cursor-pointer ${extremeDark ? "text-cyan-300/80 bg-cyan-950/25 border border-cyan-500/20" : "text-slate-300 hover:text-cyan-200"}`}>
-                <Moon className="w-4 h-4" />
-              </button>
-              <button type="button" onClick={() => { onNewSession(); onSelectView("conversations"); }} aria-label="Nouvelle conversation" className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl cursor-pointer ${extremeDark ? "text-slate-400" : "text-slate-300"}`}>
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <HudTopBar
+            compact
+            statusText={statusText}
+            tone={statusTone}
+            isOnline={isOnline}
+            geminiModel={geminiModel}
+            leading={
+              <>
+                <button
+                  ref={menuButtonRef}
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Ouvrir le menu"
+                  aria-expanded={mobileMenuOpen}
+                  aria-controls="jarvis-mobile-menu"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[#eaf6ff] cursor-pointer"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <span className="hud-title font-display text-sm font-semibold tracking-[0.2em] text-[#eaf6ff] sm:text-base">
+                  JARVIS
+                </span>
+              </>
+            }
+            actions={
+              <>
+                <button type="button" onClick={onToggleExtremeDark} aria-pressed={extremeDark} aria-label={extremeDark ? "Désactiver le mode sombre extrême" : "Activer le mode sombre extrême"} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[#8495a8] cursor-pointer">
+                  <Moon className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => { onNewSession(); onSelectView("conversations"); }} aria-label="Nouvelle conversation" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[#eaf6ff] cursor-pointer">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </>
+            }
+          />
         </header>
 
-        {/* HUD status bar */}
+        {/* HUD status bar (desktop) */}
         <div
           role="status"
           aria-live="polite"
-          className={`shrink-0 border-b px-3.5 sm:px-6 h-10 flex items-center justify-between gap-3 text-xs ${
-            extremeDark ? "bg-black border-white/[0.04]" : "jarvis-glass border-cyan-400/15"
+          className={`hidden lg:flex shrink-0 border-b text-xs hud-panel rounded-none ${
+            extremeDark ? "border-white/[0.04] bg-black" : "border-cyan-400/15"
           }`}
         >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                voiceState === "error" ? "bg-red-400" : voiceState === "offline" || !isOnline ? "bg-amber-400" : voiceState === "speaking" ? "bg-cyan-300" : voiceState === "listening" ? "bg-cyan-400" : voiceState === "thinking" || voiceState === "connecting" ? "bg-blue-400" : "bg-cyan-500/45"
-              }`}
-              aria-hidden="true"
-            />
-            <span className={`font-mono-tabular font-medium tracking-[0.16em] whitespace-nowrap ${statusColorClass}`}>{statusText}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 font-mono-tabular text-[11px]">
-            {!isOnline ? (
-              <span className="inline-flex items-center gap-1.5 text-amber-300"><WifiOff className="w-3.5 h-3.5" /><span>Hors ligne</span></span>
-            ) : (
-              <span className={extremeDark ? "text-slate-500" : "text-cyan-300/80"}>{geminiModel ? `En ligne · ${geminiModel}` : "En ligne"}</span>
-            )}
-          </div>
+          <HudTopBar
+            statusText={statusText}
+            tone={statusTone}
+            isOnline={isOnline}
+            geminiModel={geminiModel}
+          />
         </div>
 
         {/* Active view */}
-        <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+        <main id="jarvis-main" tabIndex={-1} className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</main>
 
-        {/* Mobile bottom nav (discrète) */}
-        <nav
-          aria-label="Accès rapide"
-          className={`lg:hidden shrink-0 border-t pb-safe ${extremeDark ? "bg-black border-white/[0.05]" : "jarvis-glass border-cyan-400/15"}`}
-        >
-          <div className="flex px-1 pt-1 gap-0.5">
-            {MOBILE_QUICK.map((item) => {
-              const Icon = item.icon;
-              const selected = isItemActive(item);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => runItem(item)}
-                  aria-current={selected ? "page" : undefined}
-                  className={`flex flex-col items-center justify-center gap-0.5 min-h-[48px] flex-1 px-1 rounded-xl transition-colors cursor-pointer ${
-                    selected ? (extremeDark ? "text-cyan-300 bg-cyan-950/30" : "text-cyan-300 bg-cyan-500/12") : (extremeDark ? "text-slate-500" : "text-slate-400")
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="text-[10px] font-medium truncate max-w-full">{item.mobileLabel}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+        {/* Mobile bottom nav (rubriques principales + menu secondaire) */}
+        {!keyboardOpen && (
+          <nav
+            aria-label="Navigation principale mobile"
+            className={`lg:hidden shrink-0 border-t pb-safe ${extremeDark ? "bg-black border-white/[0.05]" : "jarvis-glass border-cyan-400/15"}`}
+          >
+            <div className="flex px-1 pt-1 gap-0.5">
+              {MOBILE_QUICK.map((item) => {
+                const Icon = item.icon;
+                const selected = isItemActive(item);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => runItem(item)}
+                    aria-current={selected ? "page" : undefined}
+                    className={`flex flex-col items-center justify-center gap-0.5 min-h-[52px] flex-1 px-1 rounded-xl transition-colors cursor-pointer ${
+                      selected ? (extremeDark ? "text-cyan-300 bg-cyan-950/30" : "text-cyan-300 bg-cyan-500/12") : (extremeDark ? "text-slate-400" : "text-slate-400")
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span className="text-[10px] font-medium truncate max-w-full leading-tight">{item.mobileLabel}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Ouvrir le menu secondaire"
+                className={`flex flex-col items-center justify-center gap-0.5 min-h-[52px] flex-1 px-1 rounded-xl transition-colors cursor-pointer ${extremeDark ? "text-slate-400" : "text-slate-400"}`}
+              >
+                <MoreHorizontal className="w-5 h-5 shrink-0" />
+                <span className="text-[10px] font-medium truncate max-w-full leading-tight">Menu</span>
+              </button>
+            </div>
+          </nav>
+        )}
 
         {/* Mobile slide-over menu (sidebar unifiée) */}
         {mobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-50">
-            <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-label="Fermer le menu" onClick={() => setMobileMenuOpen(false)} />
-            <div className={`absolute inset-y-0 left-0 w-[min(88vw,340px)] border-r flex flex-col overflow-hidden ${extremeDark ? "bg-black border-white/[0.08]" : "bg-[#040916] border-cyan-400/15"}`}>
+            <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-label="Fermer le menu" onClick={() => setMobileMenuOpen(false)} tabIndex={-1} />
+            <div
+              ref={mobileMenuRef}
+              id="jarvis-mobile-menu"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu de navigation principal"
+              className={`absolute inset-y-0 left-0 w-[min(88vw,340px)] border-r flex flex-col overflow-hidden ${extremeDark ? "bg-black border-white/[0.08]" : "bg-[#040916] border-cyan-400/15"}`}
+            >
               {mobileSidebarSlot ? (
                 <div className="h-full min-h-0">
                   {typeof mobileSidebarSlot === "function"
@@ -307,7 +429,7 @@ export function NavShell({
                   <div className="h-14 px-4 flex items-center justify-between border-b border-white/[0.06]">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg grid place-items-center bg-cyan-500/15 border border-cyan-400/20"><span className="text-sm font-display font-semibold text-cyan-300">J</span></div>
-                      <span className="font-display text-slate-100">JARVIS 3.0</span>
+                      <span className="font-display text-slate-100">JARVIS 4.0</span>
                     </div>
                     <button type="button" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 grid place-items-center rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer" aria-label="Fermer">
                       <X className="w-5 h-5" />
@@ -322,6 +444,7 @@ export function NavShell({
                           key={item.id}
                           type="button"
                           onClick={() => runItem(item)}
+                          aria-current={selected ? "page" : undefined}
                           className={`w-full flex items-center gap-3 min-h-[44px] px-3.5 rounded-xl border text-sm text-left cursor-pointer ${
                             selected
                               ? "bg-cyan-500/15 border-cyan-400/30 text-cyan-100"

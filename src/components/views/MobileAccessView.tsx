@@ -103,7 +103,7 @@ export function MobileAccessView({ extremeDark, isOnline }: MobileAccessViewProp
             <StatusRow label="Synchronisation multi-appareils (conversations/mémoire/projets)" value="Non opérationnelle — nécessite backend/compte et stockage synchronisé sécurisé configurés (0 €)" ok={false} />
             <StatusRow label="Accès aux rubriques" value="Accueil, Conversations, Studio Images, Centre de contrôle, etc. via interface responsive" ok />
           </div>
-          <p className="text-xs text-slate-500">Les données actuelles sont principalement locales à cet appareil/navigateur selon les modules existants. Aucune synchronisation inter-appareils n’est simulée.</p>
+          <p className="text-xs text-slate-500">Les données actuelles sont principalement locales à cet appareil/navigateur selon les modules existants. Aucune synchronisation inter-appareils n’est simulée. La rubrique « Appareils » permet uniquement de préparer une portabilité manuelle (identité locale, export/import) — sans compte ni transmission.</p>
         </section>
 
         <section className={`${card} space-y-3`}>

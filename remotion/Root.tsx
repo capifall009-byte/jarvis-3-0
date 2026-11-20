@@ -26,6 +26,7 @@ import { JarvisVideo } from "./video/JarvisVideo";
 import { calculateJarvisVideoMetadata } from "./video/metadata";
 import {
   DEFAULT_JARVIS_VIDEO_PROPS,
+  JARVIS_VIDEO_COMPOSITIONS,
   JARVIS_VIDEO_SIZES,
   type JarvisVideoFormat,
 } from "./video/types";
@@ -66,15 +67,13 @@ export const RemotionRoot: React.FC = () => {
         height={HORROR_HEIGHT}
       />
 
-      {/* Générateur vidéo JARVIS : scénario JSON, 9:16 et 16:9 */}
-      {(["vertical", "horizontal"] as JarvisVideoFormat[]).map((format) => {
+      {/* Générateur vidéo JARVIS : scénario JSON, 9:16, 16:9 et 1:1 */}
+      {(Object.keys(JARVIS_VIDEO_COMPOSITIONS) as JarvisVideoFormat[]).map((format) => {
         const size = JARVIS_VIDEO_SIZES[format];
         return (
           <Composition
             key={format}
-            id={
-              format === "vertical" ? "JarvisVideoVertical" : "JarvisVideoHorizontal"
-            }
+            id={JARVIS_VIDEO_COMPOSITIONS[format]}
             component={JarvisVideo}
             durationInFrames={DEFAULT_JARVIS_VIDEO_PROPS.scenes.reduce(
               (sum, scene) => sum + scene.durationInFrames,

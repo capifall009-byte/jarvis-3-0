@@ -5,7 +5,7 @@
  * (tsx) et par le bundler Remotion.
  */
 
-export type JarvisVideoFormat = "vertical" | "horizontal";
+export type JarvisVideoFormat = "vertical" | "horizontal" | "square";
 
 export type JarvisVideoSceneKind = "hook" | "point" | "quote" | "cta";
 
@@ -41,11 +41,13 @@ export const JARVIS_VIDEO_SIZES: Record<
 > = {
   vertical: { width: 1080, height: 1920 },
   horizontal: { width: 1920, height: 1080 },
+  square: { width: 1080, height: 1080 },
 };
 
 export const JARVIS_VIDEO_COMPOSITIONS: Record<JarvisVideoFormat, string> = {
   vertical: "JarvisVideoVertical",
   horizontal: "JarvisVideoHorizontal",
+  square: "JarvisVideoSquare",
 };
 
 export const DEFAULT_JARVIS_VIDEO_PROPS: JarvisVideoProps = {

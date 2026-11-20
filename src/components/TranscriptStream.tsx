@@ -154,8 +154,8 @@ export function TranscriptStream({
   const isEmpty = messages.length === 0 && !interimTranscript && !isThinking;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto jarvis-scroll px-3 sm:px-6 py-4">
-      <div className="max-w-3xl mx-auto space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden jarvis-scroll overscroll-contain px-3 sm:px-6 py-3 sm:py-4">
+      <div className="max-w-3xl mx-auto space-y-3 sm:space-y-4">
         {isEmpty && (
           <div className="py-10 sm:py-16 text-center space-y-5">
             <div className={`mx-auto w-14 h-14 rounded-2xl flex items-center justify-center border ${extremeDark ? "border-cyan-500/20 bg-cyan-950/20" : "border-cyan-400/25 bg-cyan-500/10"}`}>
@@ -208,7 +208,7 @@ export function TranscriptStream({
 
                 {msg.text && msg.text.trim().length > 0 && (
                   <div
-                    className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap break-words ${
+                    className={`rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap break-words ${
                       isUser
                         ? extremeDark
                           ? "bg-cyan-600/25 text-slate-50 border border-cyan-500/25 rounded-br-md"
@@ -222,16 +222,16 @@ export function TranscriptStream({
                   </div>
                 )}
 
-                <div className={`mt-1 flex items-center gap-1.5 px-1 ${isUser ? "justify-end" : "justify-start"}`}>
-                  <span className="text-[10px] text-slate-500">{formatTime(msg.timestamp)}</span>
+                <div className={`mt-1 flex items-center gap-1 px-1 ${isUser ? "justify-end" : "justify-start"}`}>
+                  <span className="text-[10px] text-slate-500 px-1">{formatTime(msg.timestamp)}</span>
                   {msg.text && (
-                    <button type="button" onClick={() => copy(msg.id, msg.text)} className="inline-flex items-center justify-center w-6 h-6 rounded-md text-slate-500 hover:text-cyan-300 hover:bg-white/[0.04] cursor-pointer" title="Copier">
-                      {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <button type="button" onClick={() => copy(msg.id, msg.text)} className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg text-slate-500 hover:text-cyan-300 hover:bg-white/[0.04] cursor-pointer" title="Copier" aria-label="Copier le message">
+                      {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   )}
                   {!isUser && !msg.isPartial && onRegenerate && (
-                    <button type="button" onClick={() => onRegenerate(msg.id)} className="inline-flex items-center justify-center w-6 h-6 rounded-md text-slate-500 hover:text-cyan-300 hover:bg-white/[0.04] cursor-pointer" title="Régénérer">
-                      <RotateCcw className="w-3.5 h-3.5" />
+                    <button type="button" onClick={() => onRegenerate(msg.id)} className="inline-flex items-center justify-center min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg text-slate-500 hover:text-cyan-300 hover:bg-white/[0.04] cursor-pointer" title="Régénérer" aria-label="Régénérer la réponse">
+                      <RotateCcw className="w-4 h-4" />
                     </button>
                   )}
                 </div>

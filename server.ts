@@ -13,11 +13,18 @@ import { createAiVideoRouter } from "./server/modules/aiVideoRoute.ts";
 import { createReelRouter } from "./server/modules/reelRoute.ts";
 import { createHyperframesRouter } from "./server/modules/hyperframesRoute.ts";
 import { createVideoStudioRouter } from "./server/modules/videoStudioRoute.ts";
+import { createRemotionRouter } from "./server/modules/remotion/remotionRoute.ts";
 import { createSocialRouter } from "./server/modules/socialRoute.ts";
 import { createAiProvidersRouter } from "./server/modules/aiProvidersRoute.ts";
 import { createOllamaRouter } from "./server/modules/ollamaRoute.ts";
 import { createImageGenRouter } from "./server/modules/imageGenRoute.ts";
-import { createApiSecurityMiddleware, createBasicAuthMiddleware } from "./server/modules/apiSecurity.ts";
+import { createCoreRouter } from "./server/modules/core/coreRoute.ts";
+import { startSchedulerTimer } from "./server/modules/core/schedulerTimer.ts";
+import {
+  createApiSecurityMiddleware,
+  createNetworkAccessMiddleware,
+  describeAuthConfig,
+} from "./server/modules/apiSecurity.ts";
 import { migratePlaintextTokens } from "./server/modules/social/tokenStore.ts";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -34,9 +41,14 @@ async function bootstrap() {
   }
 
   const app = express();
-  // Protection globale si une exposition publique est configurée.
-  const basicAuth = createBasicAuthMiddleware();
-  if (basicAuth) app.use(basicAuth);
+  // Phase 9.5 : contrôle d'accès GLOBAL et fail-closed. Protège /api mais aussi
+  // /reels, /hyperframes, /generated, le manifeste, le SW et la SPA.
+  // Le mode loopback reste libre ; toute exposition distante exige un secret configuré.
+  const authConfig = describeAuthConfig();
+  app.use(createNetworkAccessMiddleware());
+  console.log(
+    `[sécurité] accès local autorisé ; exposition distante ${authConfig.basicConfigured || authConfig.bearerConfigured ? "authentifiée" : "refusée (aucun secret configuré)"} ; proxy explicitement configuré : ${authConfig.trustProxy}.`
+  );
   app.use(express.json({ limit: "25mb" }));
 
   // Reels rendus (Remotion) : servis dans les deux modes, même si public/ n'est pas
@@ -55,7 +67,7 @@ async function bootstrap() {
     express.static(path.resolve(process.cwd(), "public", "generated"))
   );
 
-  // Sécurisation API (désactivée en local par défaut, prête pour un déploiement distant).
+  // Limitation de débit /api (l'authentification est désormais globale, sans doublon).
   app.use("/api", createApiSecurityMiddleware());
 
   app.use("/api", createGeminiRouter());
@@ -69,10 +81,22 @@ async function bootstrap() {
   app.use("/api", createReelRouter());
   app.use("/api", createHyperframesRouter());
   app.use("/api", createVideoStudioRouter());
+  // Service Remotion isolé (routes additives, mêmes protections que les autres /api).
+  app.use("/api", createRemotionRouter());
   app.use("/api", createSocialRouter());
   app.use("/api", createAiProvidersRouter());
   app.use("/api", createOllamaRouter());
   app.use("/api", createImageGenRouter());
+  // Noyau Central Intelligence 4.0+ (additif, sous la même protection /api).
+  // Phase 5 : le minuteur in-process démarre quand le Core est réellement prêt.
+  app.use("/api", createCoreRouter({
+    // Phase 9.5 : initialisation immédiate au démarrage, sans attendre la première requête /api.
+    eagerStart: true,
+    onReady: (core) => {
+      const timer = startSchedulerTimer(core);
+      console.log(`[scheduler] tick serveur actif toutes les ${timer.intervalMs} ms (in-process, STOP GLOBAL respecté).`);
+    },
+  }));
 
   const httpServer = http.createServer(app);
 

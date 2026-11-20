@@ -158,6 +158,7 @@ const SceneBody: React.FC<{
   const { fps } = useVideoConfig();
   const tone = ACCENTS[accent] ?? ACCENTS.cyan;
   const isVertical = height > width;
+  const isSquare = width === height;
 
   const enter = spring({
     frame,
@@ -174,8 +175,8 @@ const SceneBody: React.FC<{
   const opacity = Math.min(enter, exit);
   const rise = (1 - enter) * 64;
 
-  const padding = isVertical ? 104 : 150;
-  const base = isVertical ? 1 : 1.08;
+  const padding = isSquare ? 92 : isVertical ? 104 : 150;
+  const base = isSquare ? 0.92 : isVertical ? 1 : 1.08;
   const headlineLength = scene.headline.length;
   const headlineSize =
     (headlineLength > 46 ? 62 : headlineLength > 32 ? 76 : headlineLength > 20 ? 90 : 106) *
@@ -247,7 +248,7 @@ const SceneBody: React.FC<{
       >
         <div
           style={{
-            maxWidth: isVertical ? width - padding * 2 : width * 0.68,
+            maxWidth: isSquare || isVertical ? width - padding * 2 : width * 0.68,
             display: "flex",
             flexDirection: "column",
             gap: 28,
@@ -295,7 +296,7 @@ const SceneBody: React.FC<{
                 fontSize: sublineSize,
                 lineHeight: 1.35,
                 color: "rgba(203,213,225,0.86)",
-                maxWidth: isVertical ? width - padding * 2 : width * 0.6,
+                maxWidth: isSquare || isVertical ? width - padding * 2 : width * 0.6,
               }}
             >
               {scene.subline}
